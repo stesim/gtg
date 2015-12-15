@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Art Gallery</title>
+  <meta charset="utf-8">
+</head>
+<body style="margin: 0; padding: 0; overflow: hidden;">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r14/Stats.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r73/three.min.js"></script>
+
+<script id="vs_floor1" type="x-shader/x-vertex">
+varying vec2 vUv;
+
+void main()
+{
+	vUv = uv;
+	gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+}
+</script>
+
+<script id="fs_floor1" type="x-shader/x-fragment">
+uniform float fIntensity;
+uniform float fLines;
+uniform vec2 vecRandomParam;
+
+varying vec2 vUv;
+
+#define M_PI 3.1415926535897932384626433832795
+
+float rand( vec2 co )
+{
+	return fract( sin( dot( co.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+}
+
+float componentValue( vec2 uv )
+{
+	return pow( abs ( sin( ( uv.x * fLines ) * M_PI ) ), 200.0 );
+}
+
+void main()
+{
+	float r = rand( vec2( floor( vUv.x * fLines ) + 1.41, 1.0 ) ) * 0.8 + 0.2;
+	float s = rand( vec2( floor( vUv.y * fLines ) + 4.20, 1.0 ) ) * 0.8 + 0.2;
+
+	vec4 color = vec4( 1.0, 0.0, 0.0, 1.0 );
+	vec4 backColor = vec4( 0.05, 0.05, 0.05, 1.0 );
+	gl_FragColor = color * fIntensity *
+		max( r * componentValue( vUv.xy ), s * componentValue( vUv.yx ) ) + backColor;
+	gl_FragColor.a = 1.0;
+}
+</script>
+
+<script src="dcel.js"></script>
+<script src="shaders.js"></script>
+<script src="gallery.js"></script>
+
+</body>
+</html>
