@@ -1,5 +1,5 @@
 var WIDTH, HEIGHT;
-var stats, info;
+var stats, info, svgContainer, exportLink;
 var scene, topCamera, fxCamera, renderer, wallMaterial, groundMaterial;
 var time;
 var ground;
@@ -80,6 +80,28 @@ function init()
 //	stats.domElement.style.left = '10px';
 //	stats.domElement.style.bottom = '10px';
 //	document.body.appendChild( stats.domElement );
+
+	svgContainer = document.getElementById( "svg-container" );
+
+	document.getElementById( "svg-picker" ).onchange = onSvgSelected;
+
+	document.getElementById( "txt-picker" ).onchange = onTxtSelected;
+
+	exportLink = document.getElementById( "export-link" );
+	exportLink.style.visibility = "hidden";
+	document.getElementById( "construct-export-link" ).onclick = function()
+	{
+		var link = createExportLink();
+		if( link != null )
+		{
+			exportLink.href = link;
+			exportLink.style.visibility = "visible";
+		}
+		else
+		{
+			exportLink.style.visibility = "hidden";
+		}
+	};
 
 	info = document.createElement( 'div' );
 	info.style.position = 'absolute';
@@ -257,6 +279,225 @@ function projectPointToViewport( viewport, coord )
 	}
 }
 
+function onSvgSelected( event )
+{
+	var input = event.target;
+
+	var reader = new FileReader();
+	reader.onload = function()
+	{
+		importLevel( importSvg, reader.result );
+	};
+	reader.readAsText( input.files[ 0 ] );
+}
+
+function importLevel( internal, data )
+{
+	restart();
+	changeState( GameState.Unknown );
+
+	var points = internal( data );
+
+	if( points != null )
+	{
+		polygon = points;
+
+		normalizePolygon( Math.min( WIDTH, HEIGHT ) );
+		createPolygonMeshes();
+
+//		console.log( "Final polygon:" );
+//		for( var i = 0; i < polygon.length; ++i )
+//		{
+//			console.log( "( " + polygon[ i ].x + ", " + polygon[ i ].y + " )" );
+//		}
+
+		changeState( GameState.LevelProcessing );
+	}
+	else
+	{
+		alert( "Importing level geometry failed!" );
+	}
+}
+
+function importSvg( svg )
+{
+	svgContainer.innerHTML = svg;
+
+	// TODO: find right path if more than one are present
+	var pathElems = document.getElementsByTagName( "path" );
+	if( pathElems.length <= 0 )
+	{
+		return null;
+	}
+	var segments = pathElems[ 0 ].pathSegList;
+	var length = pathElems[ 0 ].pathSegList.numberOfItems;
+	if( length <= 0 )
+	{
+		return null;
+	}
+
+	var points = new Array();
+	var seg = segments.getItem( 0 );
+	if( seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_ABS ||
+	    seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_REL )
+	{
+		points.push( new THREE.Vector2( seg.x, seg.y ) );
+//		console.log( "Imported point: ( " + seg.x + ", " + seg.y + " )" );
+	}
+	else
+	{
+		return null;
+	}
+
+	for( var i = 1; i < length; ++i )
+	{
+		var seg = segments.getItem( i );
+		switch( seg.pathSegType )
+		{
+			case SVGPathSeg.PATHSEG_LINETO_ABS:
+			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_ABS:
+				points.push( new THREE.Vector2( seg.x, seg.y ) );
+//				console.log( "Imported point: ( " + seg.x + ", " + seg.y + " )" );
+				break;
+			case SVGPathSeg.PATHSEG_LINETO_REL:
+			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_REL:
+				points.push(
+					new THREE.Vector2( seg.x, seg.y )
+					.add( points[ points.length - 1 ] ) );
+//				console.log( "Imported point: +( " + seg.x + ", " + seg.y + " ) = ( " + points[ points.length - 1 ].x + ", " + points[ points.length - 1 ].y + " )" );
+				break;
+			case SVGPathSeg.PATHSEG_CLOSEPATH:
+				if( i < length - 1 )
+				{
+					return null;
+				}
+				break;
+			default:
+				return null;
+		}
+	}
+
+	return points;
+}
+
+function onTxtSelected( event )
+{
+	var input = event.target;
+
+	var reader = new FileReader();
+	reader.onload = function()
+	{
+		importLevel( importTxt, reader.result );
+	};
+	reader.readAsText( input.files[ 0 ] );
+}
+
+function importTxt( txt )
+{
+	var lines = txt.split( '\n' );
+	var points = new Array();
+	for( var i = 0; i < lines.length; ++i )
+	{
+		if( lines[ i ] == "" )
+		{
+			continue;
+		}
+
+		var coords = lines[ i ].split( ',' );
+		var x = parseFloat( coords[ 0 ] );
+		var y = parseFloat( coords[ 1 ] );
+		if( isNaN( x ) || !isFinite( x ) || isNaN( y ) || !isFinite( y ) )
+		{
+			return null;
+		}
+		points.push( new THREE.Vector2( x, y ) );
+	}
+	return points;
+}
+
+function normalizePolygon( size )
+{
+	if( polygon.length <= 0 )
+	{
+		return;
+	}
+
+	var xmin = polygon[ 0 ].x;
+	var xmax = xmin;
+	var ymin = polygon[ 0 ].y;
+	var ymax = ymin;
+	for( var i = 1; i < polygon.length; ++i )
+	{
+		var p = polygon[ i ];
+		if( p.x < xmin )
+		{
+			xmin = p.x;
+		}
+		else if( p.x > xmax )
+		{
+			xmax = p.x;
+		}
+		if( p.y < ymin )
+		{
+			ymin = p.y;
+		}
+		else if( p.y > ymax )
+		{
+			ymax = p.y;
+		}
+	}
+
+	var scale = Math.min( size / ( xmax - xmin ), size / ( ymax - ymin ) );
+	var center =
+		new THREE.Vector2( 0.5 * ( xmax + xmin ), 0.5 * ( ymax + ymin ) );
+//	console.log( "Size: [ " + ( xmax - xmin ) + ", " + ( ymax - ymin ) + " ]" );
+//	console.log( "Center: ( " + center.x + ", " + center.y + " )" );
+
+	for( var i = 0; i < polygon.length; ++i )
+	{
+		polygon[ i ].sub( center ).multiplyScalar( scale );
+	}
+}
+
+function createPolygonMeshes()
+{
+	if( polygon.length <= 0 )
+	{
+		return;
+	}
+
+	polygonMeshes.add( createPillar( polygon[ 0 ] ) );
+
+	for( var i = 1; i < polygon.length; ++i )
+	{
+		polygonMeshes.add( createPillar( polygon[ i ] ) );
+		polygonMeshes.add( createWall( polygon[ i - 1 ], polygon[ i ] ) );
+	}
+
+	if( polygon.length > 2 )
+	{
+		polygonMeshes.add(
+			createWall( polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
+	}
+}
+
+function createExportLink()
+{
+	if( polygon.length <= 0 )
+	{
+		return null;
+	}
+
+	var txt = new String();
+	for( var i = 0; i < polygon.length; ++i )
+	{
+		txt += polygon[ i ].x + "," + polygon[ i ].y + "\n";
+	}
+
+	var blob = new Blob( [ txt ], { type: "text/plain" } );
+	return URL.createObjectURL( blob );
+}
+
 function createWall( start, end )
 {
 	var WALLHEIGHT = 100;
@@ -363,13 +604,22 @@ function onKeyDown( event )
 	switch( String.fromCharCode( event.keyCode ) )
 	{
 		case 'C':
-			changeState( GameState.LevelCreation );
+			if( state == GameState.Unknown )
+			{
+				changeState( GameState.LevelCreation );
+			}
 			break;
 		case 'F':
-			changeState( GameState.LevelProcessing );
+			if( state == GameState.LevelCreation )
+			{
+				changeState( GameState.LevelProcessing );
+			}
 			break;
 		case 'Z':
-			undoWall();
+			if( state == GameState.LevelCreation )
+			{
+				undoWall();
+			}
 			break;
 		case 'Q':
 			changeState( GameState.Unknown );
@@ -392,29 +642,15 @@ function changeState( s )
 	{
 		restart();
 	}
-	else
+	else if( s == GameState.LevelProcessing )
 	{
-		switch( state )
+		if( polygon.length > 2 )
 		{
-			case GameState.Unknown:
-				if( s != GameState.LevelCreation )
-				{
-					return;
-				}
-				break;
-			case GameState.LevelCreation:
-				if( s == GameState.LevelProcessing && polygon.length >= 2 )
-				{
-					processLevel();
-				}
-				else
-				{
-					return;
-				}
-				break;
-			case GameState.LevelProcessing:
-				return; //TODO
-				break;
+			processLevel();
+		}
+		else
+		{
+			return;
 		}
 	}
 

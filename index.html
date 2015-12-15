@@ -4,7 +4,17 @@
   <title>Art Gallery</title>
   <meta charset="utf-8">
 </head>
-<body style="margin: 0; padding: 0; overflow: hidden;">
+<body style="margin: 0; padding: 0; overflow: hidden; color: #ffffff;">
+
+<div style="position: absolute; left: 10px; top: 50px;">
+	Import level geometry from SVG file: <input type="file" accept=".svg" id="svg-picker" style="z-index: 99999;" />
+	<br />
+	Import level geometry from text file: <input type="file" accept=".txt" id="txt-picker" style="z-index: 99999;" />
+	<br />
+	<button id="construct-export-link">Compute level export link</button>
+	<a id="export-link" style="color: #aaaaff">[export]</a>
+	<div id="svg-container" style="z-index: -9999; visibility: hidden;"></div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r14/Stats.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r73/three.min.js"></script>
