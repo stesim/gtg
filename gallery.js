@@ -5,6 +5,12 @@ var time;
 var ground;
 var ambientLight;
 
+var WALLHEIGHT = 100;
+var WALLWIDTH = 10;
+var PILLARHEIGHT = 110;
+var PICTUREOFFSETMIN = 30;
+var PICTUREOFFSETMAX = 150;
+
 var topView = {
 	background: new THREE.Color().setRGB( 0.5, 0.5, 0.5 ),
 	camera: new THREE.OrthographicCamera( -100, 100, 100, -100, 0.1, 20000 ),
@@ -500,14 +506,12 @@ function createExportLink()
 
 function createWall( start, end )
 {
-	var WALLHEIGHT = 100;
-
 	var diff = end.clone().sub( start );
 	var center = new THREE.Vector3().lerpVectors( start, end, 0.5 );
 	var length = diff.length();
 
 	var wall = new THREE.Mesh(
-		new THREE.BoxGeometry( length, 10, WALLHEIGHT ),
+		new THREE.BoxGeometry( length, WALLWIDTH, WALLHEIGHT ),
 		wallMaterial );
 	wall.rotation.set( 0, 0, Math.atan2( diff.y, diff.x ) );
 	wall.position.set( center.x, center.y, WALLHEIGHT / 2 );
@@ -517,8 +521,6 @@ function createWall( start, end )
 
 function createPillar( pos )
 {
-	var PILLARHEIGHT = 110;
-
 	var pillar = new THREE.Mesh(
 		new THREE.CylinderGeometry( 10, 10, PILLARHEIGHT, 16, 1 ),
 		wallMaterial );
@@ -695,4 +697,52 @@ function processLevel()
 
 		iter = iter.next;
 	} while( iter != dcel );
+
+	placePictures();
 }
+
+function placePictures()
+{
+	function randOffset()
+	{
+		var r = Math.random();
+		return ( r * PICTUREOFFSETMIN + ( 1 - r ) * PICTUREOFFSETMAX ); 
+	}
+
+	var texture = new THREE.TextureLoader().load( "apple.jpg" );
+	var material = new THREE.MeshPhongMaterial( { map: texture } );
+
+	var iter = dcel;
+	do
+	{
+		var wallLength = iter.length();
+		var pos = randOffset();
+		var size = Math.min( ( Math.random() * 0.2 + 0.6 ) * WALLHEIGHT, 50 );
+
+		while( wallLength >= pos + size + PICTUREOFFSETMIN )
+		{
+			pos += 0.5 * size;
+
+			var height = 0.5 * WALLHEIGHT;
+			var normal = iter.normal().multiplyScalar( WALLWIDTH * 0.53 );
+			var dir = iter.direction();
+			var vecPos = iter.lerp( pos / wallLength ).add( normal );
+
+			var picture = new THREE.Mesh(
+				new THREE.PlaneGeometry( size, size ),
+				material );
+
+			picture.position.set( vecPos.x, vecPos.y, height );
+			picture.lookAt( new THREE.Vector3( normal.x, normal.y, 0 )
+			                .add( picture.position ) );
+
+			polygonMeshes.add( picture );
+
+			pos += 0.5 * size + randOffset();
+			size = Math.min( ( Math.random() * 0.5 + 0.3 ) * WALLHEIGHT, 50 );
+		}
+
+		iter = iter.next;
+	} while( iter != dcel );
+}
+

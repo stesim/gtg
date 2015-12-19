@@ -56,6 +56,39 @@ function HalfEdge()
 	this.face = null;
 }
 
+HalfEdge.prototype.direction = function()
+{
+	if( this.next == null || this.next.origin == null )
+	{
+		return null;
+	}
+
+	return this.next.origin.pos.clone().sub( this.origin.pos ).normalize();
+}
+
+HalfEdge.prototype.normal = function()
+{
+	var normal = this.direction();
+	normal.set( -normal.y, normal.x );
+	return normal;
+}
+
+HalfEdge.prototype.lerp = function( t )
+{
+	return new THREE.Vector2().lerpVectors(
+		this.origin.pos, this.next.origin.pos, t );
+}
+
+HalfEdge.prototype.length = function()
+{
+	if( this.next == null || this.next.origin == null )
+	{
+		return null;
+	}
+
+	return this.origin.pos.distanceTo( this.next.origin.pos );
+}
+
 function simplePolygonFromVectorList( vectors )
 {
 	function checkIfCCW( poly )
