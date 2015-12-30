@@ -4,6 +4,8 @@ var scene, topCamera, fxCamera, renderer, wallMaterial, groundMaterial;
 var time;
 var ground;
 var ambientLight;
+var probeMesh;
+var basicMaterial;
 
 var WALLHEIGHT = 100;
 var WALLWIDTH = 10;
@@ -73,6 +75,8 @@ var polygon = new Array();
 var polygonMeshes;
 
 var dcel = null;
+
+var cameraIndex = 0;
 
 init();
 animate();
@@ -178,13 +182,14 @@ function init()
 //		} );
 	wallMaterial =
 		new THREE.MeshPhongMaterial( {
-			color: 0xaaaaaa,
+			color: 0x333333,
 			specular: 0xffffff,
-			shininess: 50,
+			shininess: 5,
 		} );
 
-	groundMaterial = shaders.floor1;
-	groundMaterial.uniforms.fLines.value = 64.0;
+//	groundMaterial = shaders.floor1;
+//	groundMaterial.uniforms.fLines.value = 64.0;
+	groundMaterial = wallMaterial; //new THREE.MeshBasicMaterial( { color: 0x000000 } )
 
 	ground = new THREE.Mesh(
 		new THREE.PlaneGeometry( 3000, 3000 ),
@@ -206,6 +211,19 @@ function init()
 	scene.add( polygonMeshes );
 
 	time = new THREE.Clock( true );
+
+	probeMesh = new THREE.Mesh(
+		new THREE.SphereGeometry( 10, 16, 16 ),
+		new THREE.MeshBasicMaterial( { color: 0xff0000 } ) );
+	probeMesh.visible = false;
+
+	scene.add( probeMesh );
+	
+	basicMaterial = new THREE.MeshBasicMaterial(
+		{ vertexColors: THREE.VertexColors } );
+	basicMaterial.transparent = true;
+	basicMaterial.opacity = 0.5;
+	basicMaterial.needsUpdate = true;
 }
 
 function animate()
@@ -214,16 +232,16 @@ function animate()
 
 	setView( fxView );
 
-	ground.visible = true;
-	groundMaterial.uniforms.fIntensity.value =
-		0.5 * Math.pow( Math.sin( time.getElapsedTime() + Math.PI ), 2 ) + 0.10;
-	groundMaterial.uniforms.vecRandomParam.value =
-		new THREE.Vector2( time.getElapsedTime(), time.getDelta() );
+//	ground.visible = true;
+//	groundMaterial.uniforms.fIntensity.value =
+//		0.5 * Math.pow( Math.sin( time.getElapsedTime() + Math.PI ), 2 ) + 0.10;
+//	groundMaterial.uniforms.vecRandomParam.value =
+//		new THREE.Vector2( time.getElapsedTime(), time.getDelta() );
 	renderer.render( scene, fxView.camera );
 
 	setView( topView );
 
-	ground.visible = false;
+//	ground.visible = false;
 	renderer.render( scene, topView.camera );
 
 	requestAnimationFrame( animate );
@@ -237,6 +255,10 @@ function restart()
 	scene.remove( polygonMeshes );
 	polygonMeshes = new THREE.Object3D();
 	scene.add( polygonMeshes );
+
+	probeMesh.visible = false;
+
+	console.clear();
 }
 
 function setView( view )
@@ -310,12 +332,6 @@ function importLevel( internal, data )
 
 		normalizePolygon( Math.min( WIDTH, HEIGHT ) );
 		createPolygonMeshes();
-
-//		console.log( "Final polygon:" );
-//		for( var i = 0; i < polygon.length; ++i )
-//		{
-//			console.log( "( " + polygon[ i ].x + ", " + polygon[ i ].y + " )" );
-//		}
 
 		changeState( GameState.LevelProcessing );
 	}
@@ -456,8 +472,6 @@ function normalizePolygon( size )
 	var scale = Math.min( size / ( xmax - xmin ), size / ( ymax - ymin ) );
 	var center =
 		new THREE.Vector2( 0.5 * ( xmax + xmin ), 0.5 * ( ymax + ymin ) );
-//	console.log( "Size: [ " + ( xmax - xmin ) + ", " + ( ymax - ymin ) + " ]" );
-//	console.log( "Center: ( " + center.x + ", " + center.y + " )" );
 
 	for( var i = 0; i < polygon.length; ++i )
 	{
@@ -530,40 +544,50 @@ function createPillar( pos )
 	return pillar;
 }
 
+function screenToWorldPosition( coord )
+{
+	var p = projectPointToViewport( topView.viewport, coord );
+	if( p !== null )
+	{
+		p.addScalar( -0.5 )
+		 .multiply( new THREE.Vector2( topView.viewport.width,
+									   topView.viewport.height ) )
+		 .multiplyScalar( topViewZoom );
+		//alert( p.x + ", " + p.y );
+	}
+	else
+	{
+		p = projectPointToViewport( fxView.viewport, coord );
+		if( p !== null )
+		{
+			var p3 = new THREE.Vector3( 2 * p.x - 1, 2 * p.y - 1, 0.0 );
+			p3.unproject( fxView.camera );
+			var n = p3.clone().sub( fxView.camera.position ).normalize();
+			p3.addScaledVector( n, -p3.z / n.z );
+			//console.log( p3.x + ", " + p3.y + ", " + p3.z );
+			p.set( p3.x, p3.y );
+		}
+		else
+		{
+			return null;
+		}
+	}
+
+	return p;
+}
+
 function onMouseDown( event )
 {
 	event.preventDefault();
 	var coord = new THREE.Vector2( event.clientX, HEIGHT - event.clientY );
-
-	if( state == GameState.LevelCreation )
+	var p = screenToWorldPosition( coord );
+	if( p === null )
 	{
-		var p = projectPointToViewport( topView.viewport, coord );
-		if( p != null )
-		{
-			p.addScalar( -0.5 )
-			 .multiply( new THREE.Vector2( topView.viewport.width,
-										   topView.viewport.height ) )
-			 .multiplyScalar( topViewZoom );
-			//alert( p.x + ", " + p.y );
-		}
-		else
-		{
-			p = projectPointToViewport( fxView.viewport, coord );
-			if( p != null )
-			{
-				var p3 = new THREE.Vector3( 2 * p.x - 1, 2 * p.y - 1, 0.0 );
-				p3.unproject( fxView.camera );
-				var n = p3.clone().sub( fxView.camera.position ).normalize();
-				p3.addScaledVector( n, -p3.z / n.z );
-				//console.log( p3.x + ", " + p3.y + ", " + p3.z );
-				p.set( p3.x, p3.y );
-			}
-			else
-			{
-				return;
-			}
-		}
+		return;
+	}
 
+	if( state === GameState.LevelCreation )
+	{
 		polygon.push( p );
 
 		if( polygon.length > 1 )
@@ -574,6 +598,78 @@ function onMouseDown( event )
 
 		polygonMeshes.add( createPillar( p ) );
 	}
+	else if( state === GameState.LevelProcessing )
+	{
+		probeMesh.position.set( p.x, p.y, 0 );
+		if( !probeMesh.visible )
+		{
+			probeMesh.visible = true;
+		}
+
+		if( dcel.faces[ 0 ].contains( p ) )
+		{
+			probeMesh.material.color.setHex( 0x00ff00 );
+
+			var polyPoints = new Array();
+			var iter = dcel.edges[ 0 ];
+			do
+			{
+				polyPoints.push( [ iter.origin.pos.x, iter.origin.pos.y ] );
+				iter = iter.next;
+			} while( iter !== dcel.edges[ 0 ] );
+
+			var segments =
+				VisibilityPolygon.convertToSegments( [ polyPoints ] );
+
+			var position = [ p.x, p.y ];
+
+			var visibilityPoints =
+				VisibilityPolygon.compute( position, segments );
+
+			for( var i = 0; i < visibilityPoints.length; ++i )
+			{
+				visibilityPoints[ i ] = new THREE.Vector2(
+					visibilityPoints[ i ][ 0 ],
+					visibilityPoints[ i ][ 1 ] );
+			}
+
+			var visPolyDCEL = new DCEL().fromVectorList( visibilityPoints );
+			var visPolyTri = triangulateSimplePolygon( visPolyDCEL );
+
+			var color = Math.floor( 0xffffff * Math.random() );
+			var visPolyMesh = createTriangulationMesh(
+				visPolyTri, basicMaterial, color );
+			visPolyMesh.position.set(
+				0, 0, ( ++cameraIndex ) * WALLHEIGHT / 100.0 );
+
+			polygonMeshes.add( visPolyMesh );
+
+			var cameraMesh = createCameraMesh( p, color );
+			polygonMeshes.add( cameraMesh );
+
+//			var obj = new THREE.Object3D();
+//			visualizeDCEL( visPolyDCEL.faces[ 0 ], color, obj );
+//			
+//			var cameraMesh = createCameraMesh( p, color );
+//
+//			obj.add( cameraMesh );
+//			polygonMeshes.add( obj );
+		}
+		else
+		{
+			probeMesh.material.color.setHex( 0xff0000 );
+		}
+	}
+}
+
+function createCameraMesh( pos, _color )
+{
+	var mesh = new THREE.Mesh(
+		new THREE.SphereGeometry( 12, 16, 16 ),
+		new THREE.MeshBasicMaterial( { color: _color } ) );
+	mesh.position.set( pos.x, pos.y, 0 );
+
+	return mesh;
 }
 
 function undoWall()
@@ -665,22 +761,27 @@ function processLevel()
 	polygonMeshes.add(
 		createWall( polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
 
-	dcel = simplePolygonFromVectorList( polygon );
+	dcel = new DCEL().fromVectorList( polygon );
 
-	if( dcel == null )
-	{
-		alert( "Error: Failed to create DCEL structure." );
-	}
+	placePictures();
 
-	// TODO: remove
-	var iter = dcel;
-	do
+	var triDCEL = triangulateSimplePolygon( dcel );
+	
+	var groundMesh = createTriangulationMesh( triDCEL, groundMaterial );
+	polygonMeshes.add( groundMesh );
+
+//	var obj = new THREE.Object3D();
+//	visualizeDCEL( triDCEL.faces[ 0 ], 0xffffff, obj );
+//	polygonMeshes.add( obj );
+}
+
+function visualizeDCEL( face, color, obj )
+{
+	function visualizeEdge( e )
 	{
-		var orig = new THREE.Vector3(
-			iter.prev.origin.pos.x,
-			iter.prev.origin.pos.y,
-			120 );
-		var dir2 = iter.origin.pos.clone().sub( iter.prev.origin.pos );
+		var orig2 =
+			e.normal().multiplyScalar( 3 ).add( e.origin.pos );
+		var dir2 = e.vector();
 		var len = dir2.length();
 		dir2.divideScalar( len );
 
@@ -688,17 +789,28 @@ function processLevel()
 
 		var arrow = new THREE.ArrowHelper(
 			new THREE.Vector3( dir2.x, dir2.y, 0 ),
-			orig,
+			new THREE.Vector3( orig2.x, orig2.y, 120 ),
 			len,
-			0xffffff,
+			color,
 			headLen,
 			headLen / 3 );
-		polygonMeshes.add( arrow );
+		obj.add( arrow );
+	}
+
+	face.temp = true;
+
+	var iter = face.edge;
+	do
+	{
+		if( iter.twin !== null && iter.twin.face.temp === null )
+		{
+			visualizeDCEL( iter.twin.face, color, obj );
+		}
+
+		visualizeEdge( iter );
 
 		iter = iter.next;
-	} while( iter != dcel );
-
-	placePictures();
+	} while( iter !== face.edge );
 }
 
 function placePictures()
@@ -712,7 +824,7 @@ function placePictures()
 	var texture = new THREE.TextureLoader().load( "apple.jpg" );
 	var material = new THREE.MeshPhongMaterial( { map: texture } );
 
-	var iter = dcel;
+	var iter = dcel.edges[ 0 ];
 	do
 	{
 		var wallLength = iter.length();
@@ -743,6 +855,43 @@ function placePictures()
 		}
 
 		iter = iter.next;
-	} while( iter != dcel );
+	} while( iter != dcel.edges[ 0 ] );
 }
 
+function createTriangulationMesh( dcel, material, color )
+{
+	var geom = new THREE.Geometry();
+	for( var i = 0; i < dcel.vertices.length; ++i )
+	{
+		dcel.vertices[ i ].temp = i;
+
+		geom.vertices.push( new THREE.Vector3( dcel.vertices[ i ].pos.x,
+		                                       dcel.vertices[ i ].pos.y ) );
+	}
+
+	var normal = new THREE.Vector3( 0, 0, 1 );
+
+	for( var i = 0; i < dcel.faces.length; ++i )
+	{
+		var e = dcel.faces[ i ].edge;
+		if( color )
+		{
+			geom.faces.push( new THREE.Face3(
+				e.origin.temp,
+				e.next.origin.temp,
+				e.next.next.origin.temp,
+				normal,
+				new THREE.Color( color ) ) );
+		}
+		else
+		{
+			geom.faces.push( new THREE.Face3(
+				e.origin.temp,
+				e.next.origin.temp,
+				e.next.next.origin.temp,
+				normal ) );
+		}
+	}
+
+	return new THREE.Mesh( geom, material );
+}
