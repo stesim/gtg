@@ -1,3 +1,9 @@
+var WALLHEIGHT = 100;
+var WALLWIDTH = 10;
+var PILLARHEIGHT = 110;
+var PICTUREOFFSETMIN = 30;
+var PICTUREOFFSETMAX = 150;
+
 var WIDTH, HEIGHT;
 var stats, info, svgContainer, exportLink;
 var scene, topCamera, fxCamera, renderer, wallMaterial, groundMaterial;
@@ -6,12 +12,8 @@ var ground;
 var ambientLight;
 var probeMesh;
 var basicMaterial;
-
-var WALLHEIGHT = 100;
-var WALLWIDTH = 10;
-var PILLARHEIGHT = 110;
-var PICTUREOFFSETMIN = 30;
-var PICTUREOFFSETMAX = 150;
+var renderingEnabled;
+var ui = {};
 
 var topView = {
 	background: new THREE.Color().setRGB( 0.5, 0.5, 0.5 ),
@@ -58,15 +60,8 @@ var GameState = Object.freeze( {
 	Unknown            : "Unknown",
 	LevelCreation      : "LevelCreation",
 	LevelProcessing    : "LevelProcessing",
+	CameraPlacement    : "CameraPlacement"
 } );
-
-var GameStateInfo = {};
-GameStateInfo[ GameState.Unknown ] =
-	"Press 'c' to enter level creation mode. Press 'q' at any moment to return to this screen.";
-GameStateInfo[ GameState.LevelCreation ] =
-	"Add gallery walls using left click; undo walls using 'z'. Press 'f' to close the gallery walls and finish level creation. Press 'q' to cancel level creation.";
-GameStateInfo[ GameState.LevelProcessing ] =
-	"TODO / DEBUG: DCEL visualization";
 
 var state = GameState.Unknown;
 var topViewZoom = 6.0;
@@ -91,37 +86,8 @@ function init()
 //	stats.domElement.style.bottom = '10px';
 //	document.body.appendChild( stats.domElement );
 
-	svgContainer = document.getElementById( "svg-container" );
-
-	document.getElementById( "svg-picker" ).onchange = onSvgSelected;
-
-	document.getElementById( "txt-picker" ).onchange = onTxtSelected;
-
-	exportLink = document.getElementById( "export-link" );
-	exportLink.style.visibility = "hidden";
-	document.getElementById( "construct-export-link" ).onclick = function()
-	{
-		var link = createExportLink();
-		if( link != null )
-		{
-			exportLink.href = link;
-			exportLink.style.visibility = "visible";
-		}
-		else
-		{
-			exportLink.style.visibility = "hidden";
-		}
-	};
-
-	info = document.createElement( 'div' );
-	info.style.position = 'absolute';
-	info.style.padding = '10px';
-	info.style.width = '100%';
-	info.style.textAlign = 'center';
-	info.style.color = '#ffffff';
-	setInfo( GameStateInfo[ state ] );
-
-	document.body.appendChild( info );
+	svgContainer = document.createElement( "div" );
+	svgContainer.id = "svg-container";
 
 	scene = new THREE.Scene();
 	WIDTH = window.innerWidth;
@@ -161,8 +127,7 @@ function init()
 		topView.update();
 	} );
 
-	document.addEventListener( 'mousedown', onMouseDown, false );
-	document.addEventListener( 'keydown', onKeyDown, false );
+	renderer.domElement.addEventListener( 'mousedown', onMouseDown, false );
 
 	var light = new THREE.PointLight( 0xaaaaaa );
 	light.position.set( 0, 0, 500 );
@@ -176,10 +141,6 @@ function init()
 	ambientLight = new THREE.AmbientLight( 0x000033 );
 	scene.add( ambientLight );
 
-//	wallMaterial =
-//		new THREE.MeshLambertMaterial( {
-//			color: 0xffffff
-//		} );
 	wallMaterial =
 		new THREE.MeshPhongMaterial( {
 			color: 0x333333,
@@ -187,25 +148,11 @@ function init()
 			shininess: 5,
 		} );
 
-//	groundMaterial = shaders.floor1;
-//	groundMaterial.uniforms.fLines.value = 64.0;
-	groundMaterial = wallMaterial; //new THREE.MeshBasicMaterial( { color: 0x000000 } )
+	groundMaterial = wallMaterial;
 
 	ground = new THREE.Mesh(
 		new THREE.PlaneGeometry( 3000, 3000 ),
 		groundMaterial );
-//	scene.add( ground );
-
-//	var axis = new THREE.Mesh(
-//		new THREE.BoxGeometry( 512, 16, 16 ),
-//		wallMaterial );
-//	axis.position.set( 256, 0, 0 );
-//	scene.add( axis );
-//	axis = new THREE.Mesh(
-//		new THREE.BoxGeometry( 16, 512, 16 ),
-//		wallMaterial );
-//	axis.position.set( 0, 256, 0 );
-//	scene.add( axis );
 
 	polygonMeshes = new THREE.Object3D();
 	scene.add( polygonMeshes );
@@ -224,29 +171,183 @@ function init()
 	basicMaterial.transparent = true;
 	basicMaterial.opacity = 0.5;
 	basicMaterial.needsUpdate = true;
+
+	initUI();
+
+	disableRendering();
+}
+
+function initUI()
+{
+	ui.titleText = new UI.Text( "GUARD THE GALLERY" )
+		.position( { top: 100, left: 100 } ).cssClass( "title" ).show();
+
+	ui.mainMenu = new UI.Group()
+		.position( { top: 200, left: 100 } )
+		.size( 125, 200 )
+		.cssClass( "verticalMenu" );
+	
+	ui.mainMenu.add( new UI.Button( "Story Mode",
+		function()
+		{
+			ui.mainMenu.hide();
+			ui.storyMenu.show();
+		} ).position( { top: 0, left: 0 } ).show() );
+
+	ui.mainMenu.add( new UI.Button( "Versus Mode",
+		function()
+		{
+		} ).position( { top: 40, left: 0 } ).show().disable() );
+
+	ui.mainMenu.show();
+	
+	ui.mainMenu.add( new UI.Button( "Level Creation",
+		function()
+		{
+			ui.mainMenu.hide();
+			ui.titleText.hide();
+			enableRendering();
+			changeState( GameState.LevelCreation );
+		} ).position( { top: 80, left: 0 } ).show() );
+
+	ui.storyMenu = new UI.Group()
+		.position( { top: 200, left: 100 } )
+		.size( 125, 200 )
+		.cssClass( "verticalMenu" );
+
+	ui.storyMenu.add( new UI.Button( "Continue",
+		function()
+		{
+			ui.storyMenu.hide();
+			ui.titleText.hide();
+			enableRendering();
+			loadLevel( levels[ 0 ] );
+		} ).position( { top: 0, left: 0 } ).show() );
+
+	ui.storyMenu.add( new UI.Button( "Select Level",
+		function()
+		{
+			ui.storyMenu.hide();
+			ui.levelsMenu.show();
+		} ).position( { top: 40, left: 0 } ).show() );
+	ui.storyMenu.add( new UI.Button( "BACK",
+		function()
+		{
+			ui.storyMenu.hide();
+			ui.mainMenu.show();
+		} ).position( { top: 120, left: 0 } ).show() );
+
+	ui.levelsMenu = new UI.Group()
+		.position( { top: 200, left: 100 } )
+		.size( 125, 200 )
+		.cssClass( "verticalMenu" );
+
+	var levelOnclick =
+		function( i )
+		{
+			ui.levelsMenu.hide();
+			ui.titleText.hide();
+			enableRendering();
+			loadLevel( levels[ i ] );
+		};
+	for( var i = 0; i < levels.length; ++i )
+	{
+		ui.levelsMenu.add( new UI.Button( "Level " + ( i + 1 ),
+			levelOnclick.bind( this, i ) )
+				.position( { top: 40 * i, left: 0 } ).show() );
+	}
+	ui.levelsMenu.add( new UI.Button( "BACK",
+		function()
+		{
+			ui.levelsMenu.hide();
+			ui.storyMenu.show();
+		} ).position( { top: levels.length * 40 + 40, left: 0 } ).show() );
+
+	ui.levelCreationMenu = new UI.Group()
+		.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );
+
+	ui.levelCreationMenu.cancelButton = new UI.Button( "BACK",
+		function()
+		{
+			changeState( GameState.Unknown );
+			disableRendering();
+			ui.levelCreationMenu.hide();
+			ui.mainMenu.show();
+			ui.titleText.show();
+		}, ui.levelCreationMenu ).position( { top: 0, left: 0 } ).show();
+
+	ui.levelCreationMenu.finishButton = new UI.Button( "Finish",
+		function()
+		{
+			changeState( GameState.LevelProcessing );
+		}, ui.levelCreationMenu ).position( { top: 40, left: 135 } ).show();
+
+	ui.levelCreationMenu.newButton = new UI.Button( "New",
+		function()
+		{
+			//restart();
+			changeState( GameState.Unknown );
+			changeState( GameState.LevelCreation );
+		}, ui.levelCreationMenu ).position( { top: 0, left: 135 } ).show();
+
+	ui.levelCreationMenu.undoButton = new UI.Button( "Undo",
+		function()
+		{
+			undoWall();
+		}, ui.levelCreationMenu ).position( { top: 40, left: 0 } ).show();
+
+	ui.levelCreationMenu.add( new UI.Text( "Import SVG:" )
+		.size( 150, 20 ).position( { top: 10, left: 300 } ).show() );
+	ui.levelCreationMenu.filePicker =
+		new UI.FilePicker( ".svg", onSvgSelected, ui.levelCreationMenu )
+			.position( { top: 35, left: 300 } ).show();
+
+	ui.levelCreationMenu.exportLink =
+		new UI.Link( "[JS Level File]", null, ui.levelCreationMenu )
+			.size( 130, 20 ).position( { top: 40, left: 0 } );
+
+	ui.ingameMenu = new UI.Group()
+		.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );
+
+	ui.ingameMenu.quitButton = new UI.Button( "QUIT",
+		function()
+		{
+			changeState( GameState.Unknown );
+			disableRendering();
+			ui.ingameMenu.hide();
+			ui.storyMenu.show();
+			ui.titleText.show();
+		}, ui.ingameMenu ).position( { top: 0, left: 0 } ).show();
 }
 
 function animate()
 {
-	//stats.begin();
+	if( renderingEnabled )
+	{
+		//stats.begin();
 
-	setView( fxView );
+		setView( fxView );
+		renderer.render( scene, fxView.camera );
 
-//	ground.visible = true;
-//	groundMaterial.uniforms.fIntensity.value =
-//		0.5 * Math.pow( Math.sin( time.getElapsedTime() + Math.PI ), 2 ) + 0.10;
-//	groundMaterial.uniforms.vecRandomParam.value =
-//		new THREE.Vector2( time.getElapsedTime(), time.getDelta() );
-	renderer.render( scene, fxView.camera );
+		setView( topView );
+		renderer.render( scene, topView.camera );
 
-	setView( topView );
-
-//	ground.visible = false;
-	renderer.render( scene, topView.camera );
+		//stats.end();
+	}
 
 	requestAnimationFrame( animate );
+}
 
-	//stats.end();
+function disableRendering()
+{
+	renderer.domElement.style.visibility = "hidden";
+	renderingEnabled = false;
+}
+
+function enableRendering()
+{
+	renderer.domElement.style.visibility = "visible";
+	renderingEnabled = true;
 }
 
 function restart()
@@ -319,6 +420,23 @@ function onSvgSelected( event )
 	reader.readAsText( input.files[ 0 ] );
 }
 
+function loadLevel( level )
+{
+	function toVectorArray( level )
+	{
+		var res = new Array( level.length );
+		for( var i = 0; i < level.length; ++i )
+		{
+			res[ i ] = new THREE.Vector2( level[ i ][ 0 ], level[ i ][ 1 ] );
+		}
+		return res;
+	}
+
+	importLevel( toVectorArray, level );
+
+	changeState( GameState.CameraPlacement );
+}
+
 function importLevel( internal, data )
 {
 	restart();
@@ -346,7 +464,7 @@ function importSvg( svg )
 	svgContainer.innerHTML = svg;
 
 	// TODO: find right path if more than one are present
-	var pathElems = document.getElementsByTagName( "path" );
+	var pathElems = svgContainer.getElementsByTagName( "path" );
 	if( pathElems.length <= 0 )
 	{
 		return null;
@@ -399,41 +517,6 @@ function importSvg( svg )
 		}
 	}
 
-	return points;
-}
-
-function onTxtSelected( event )
-{
-	var input = event.target;
-
-	var reader = new FileReader();
-	reader.onload = function()
-	{
-		importLevel( importTxt, reader.result );
-	};
-	reader.readAsText( input.files[ 0 ] );
-}
-
-function importTxt( txt )
-{
-	var lines = txt.split( '\n' );
-	var points = new Array();
-	for( var i = 0; i < lines.length; ++i )
-	{
-		if( lines[ i ] == "" )
-		{
-			continue;
-		}
-
-		var coords = lines[ i ].split( ',' );
-		var x = parseFloat( coords[ 0 ] );
-		var y = parseFloat( coords[ 1 ] );
-		if( isNaN( x ) || !isFinite( x ) || isNaN( y ) || !isFinite( y ) )
-		{
-			return null;
-		}
-		points.push( new THREE.Vector2( x, y ) );
-	}
 	return points;
 }
 
@@ -508,13 +591,15 @@ function createExportLink()
 		return null;
 	}
 
-	var txt = new String();
+	var txt = "levels.push( [\n";
 	for( var i = 0; i < polygon.length; ++i )
 	{
-		txt += polygon[ i ].x + "," + polygon[ i ].y + "\n";
+		txt += "[ " + polygon[ i ].x + ", " + polygon[ i ].y;
+		txt += ( i < polygon.length - 1 ? " ],\n" : " ]\n" );
 	}
+	txt += "] );\n";
 
-	var blob = new Blob( [ txt ], { type: "text/plain" } );
+	var blob = new Blob( [ txt ], { type: "application/javascript" } );
 	return URL.createObjectURL( blob );
 }
 
@@ -598,7 +683,7 @@ function onMouseDown( event )
 
 		polygonMeshes.add( createPillar( p ) );
 	}
-	else if( state === GameState.LevelProcessing )
+	else if( state === GameState.CameraPlacement )
 	{
 		probeMesh.position.set( p.x, p.y, 0 );
 		if( !probeMesh.visible )
@@ -646,14 +731,6 @@ function onMouseDown( event )
 
 			var cameraMesh = createCameraMesh( p, color );
 			polygonMeshes.add( cameraMesh );
-
-//			var obj = new THREE.Object3D();
-//			visualizeDCEL( visPolyDCEL.faces[ 0 ], color, obj );
-//			
-//			var cameraMesh = createCameraMesh( p, color );
-//
-//			obj.add( cameraMesh );
-//			polygonMeshes.add( obj );
 		}
 		else
 		{
@@ -695,41 +772,6 @@ function undoWall()
 	}
 }
 
-function onKeyDown( event )
-{
-	event = event || window.event;
-
-	switch( String.fromCharCode( event.keyCode ) )
-	{
-		case 'C':
-			if( state == GameState.Unknown )
-			{
-				changeState( GameState.LevelCreation );
-			}
-			break;
-		case 'F':
-			if( state == GameState.LevelCreation )
-			{
-				changeState( GameState.LevelProcessing );
-			}
-			break;
-		case 'Z':
-			if( state == GameState.LevelCreation )
-			{
-				undoWall();
-			}
-			break;
-		case 'Q':
-			changeState( GameState.Unknown );
-			break;
-	}
-}
-
-function setInfo( str )
-{
-	info.innerHTML = str;
-}
-
 function changeState( s )
 {
 	if( s == state )
@@ -740,10 +782,24 @@ function changeState( s )
 	{
 		restart();
 	}
+	else if( s == GameState.LevelCreation )
+	{
+		ui.levelCreationMenu.undoButton.show();
+		ui.levelCreationMenu.finishButton.show();
+		ui.levelCreationMenu.exportLink.hide();
+		ui.levelCreationMenu.filePicker.elem.value = null;
+		ui.levelCreationMenu.show();
+	}
 	else if( s == GameState.LevelProcessing )
 	{
 		if( polygon.length > 2 )
 		{
+			ui.levelCreationMenu.finishButton.hide();
+			ui.levelCreationMenu.undoButton.hide();
+
+			var link = createExportLink();
+			ui.levelCreationMenu.exportLink.url( link ).show();
+
 			processLevel();
 		}
 		else
@@ -751,9 +807,12 @@ function changeState( s )
 			return;
 		}
 	}
+	else if( s == GameState.CameraPlacement )
+	{
+		ui.ingameMenu.show();
+	}
 
 	state = s;
-	setInfo( GameStateInfo[ state ] );
 }
 
 function processLevel()
@@ -769,10 +828,6 @@ function processLevel()
 	
 	var groundMesh = createTriangulationMesh( triDCEL, groundMaterial );
 	polygonMeshes.add( groundMesh );
-
-//	var obj = new THREE.Object3D();
-//	visualizeDCEL( triDCEL.faces[ 0 ], 0xffffff, obj );
-//	polygonMeshes.add( obj );
 }
 
 function visualizeDCEL( face, color, obj )
