@@ -60,7 +60,8 @@ var GameState = Object.freeze( {
 	Unknown            : "Unknown",
 	LevelCreation      : "LevelCreation",
 	LevelProcessing    : "LevelProcessing",
-	CameraPlacement    : "CameraPlacement"
+	CameraPlacement    : "CameraPlacement",
+	LevelCompleted     : "LevelCompleted"
 } );
 
 var state = GameState.Unknown;
@@ -72,6 +73,9 @@ var polygonMeshes;
 var dcel = null;
 
 var cameraIndex = 0;
+
+var currentLevel = 0;
+var visibilityPolygons = new Array();
 
 init();
 animate();
@@ -221,7 +225,7 @@ function initUI()
 			ui.storyMenu.hide();
 			ui.titleText.hide();
 			enableRendering();
-			loadLevel( levels[ 0 ] );
+			loadLevel( 0 );
 		} ).position( { top: 0, left: 0 } ).show() );
 
 	ui.storyMenu.add( new UI.Button( "Select Level",
@@ -248,7 +252,7 @@ function initUI()
 			ui.levelsMenu.hide();
 			ui.titleText.hide();
 			enableRendering();
-			loadLevel( levels[ i ] );
+			loadLevel( i );
 		};
 	for( var i = 0; i < levels.length; ++i )
 	{
@@ -318,6 +322,16 @@ function initUI()
 			ui.storyMenu.show();
 			ui.titleText.show();
 		}, ui.ingameMenu ).position( { top: 0, left: 0 } ).show();
+
+	ui.ingameMenu.nextButton = new UI.Button( "Next",
+		function()
+		{
+			changeState( GameState.Unknown );
+			loadLevel( ++currentLevel );
+		}, ui.ingameMenu ).position( { top: 0, left: 130 } );
+
+	ui.completionText = new UI.Text( "Level completed!" )
+		.position( { top: 100, left: 100 } ).cssClass( "title" );
 }
 
 function animate()
@@ -432,7 +446,9 @@ function loadLevel( level )
 		return res;
 	}
 
-	importLevel( toVectorArray, level );
+	importLevel( toVectorArray, levels[ level ] );
+
+	currentLevel = level;
 
 	changeState( GameState.CameraPlacement );
 }
@@ -719,18 +735,38 @@ function onMouseDown( event )
 			}
 
 			var visPolyDCEL = new DCEL().fromVectorList( visibilityPoints );
+			visibilityPolygons.push( visPolyDCEL );
+
 			var visPolyTri = triangulateSimplePolygon( visPolyDCEL );
 
 			var color = Math.floor( 0xffffff * Math.random() );
 			var visPolyMesh = createTriangulationMesh(
 				visPolyTri, basicMaterial, color );
-			visPolyMesh.position.set(
-				0, 0, ( ++cameraIndex ) * WALLHEIGHT / 100.0 );
+//			visPolyMesh.position.set(
+//				0, 0, ( ++cameraIndex ) * WALLHEIGHT / 100.0 );
 
 			polygonMeshes.add( visPolyMesh );
 
 			var cameraMesh = createCameraMesh( p, color );
 			polygonMeshes.add( cameraMesh );
+
+			// TODO/HACK
+			if( visibilityPolygons.length == 2 )
+			{
+				var color = new THREE.Color( 0xffffff );
+				var intersection = intersectSimplePolygonsDCEL(
+					visibilityPolygons[ 0 ], visibilityPolygons[ 1 ] );
+
+				var obj = new THREE.Object3D();
+				visualizeDCEL( intersection.faces[ 0 ], color, obj );
+				polygonMeshes.add( obj );
+			}
+
+			// TODO/HACK
+			if( Math.abs( visPolyDCEL.faces[ 0 ].area() - dcel.faces[ 0 ].area() ) < 0.01 )
+			{
+				changeState( GameState.LevelCompleted );
+			}
 		}
 		else
 		{
@@ -774,6 +810,12 @@ function undoWall()
 
 function changeState( s )
 {
+	if( state == GameState.LevelCompleted )
+	{
+		ui.completionText.hide();
+		ui.ingameMenu.nextButton.hide();
+	}
+
 	if( s == state )
 	{
 		return;
@@ -810,6 +852,15 @@ function changeState( s )
 	else if( s == GameState.CameraPlacement )
 	{
 		ui.ingameMenu.show();
+	}
+	else if( s == GameState.LevelCompleted )
+	{
+		ui.completionText.show();
+
+		if( levels.length > currentLevel + 1 )
+		{
+			ui.ingameMenu.nextButton.show();
+		}
 	}
 
 	state = s;

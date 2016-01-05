@@ -129,6 +129,22 @@ DCEL.prototype.fromVectorList = function( vectors )
 	return this;
 }
 
+DCEL.prototype.clearTemp = function()
+{
+	for( var edge in this.edges )
+	{
+		edge.temp = null;
+	}
+	for( var vertex in this.vertices )
+	{
+		vertex.temp = null;
+	}
+	for( var face in this.faces )
+	{
+		face.temp = null;
+	}
+}
+
 function Vertex( e, pos )
 {
 	this.edge = e;
