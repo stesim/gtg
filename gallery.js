@@ -76,6 +76,7 @@ var cameraIndex = 0;
 
 var currentLevel = 0;
 var visibilityPolygons = new Array();
+var visibilityPolygonMeshes = new Array();
 
 init();
 animate();
@@ -168,7 +169,7 @@ function init()
 		new THREE.MeshBasicMaterial( { color: 0xff0000 } ) );
 	probeMesh.visible = false;
 
-	scene.add( probeMesh );
+	//scene.add( probeMesh );
 	
 	basicMaterial = new THREE.MeshBasicMaterial(
 		{ vertexColors: THREE.VertexColors } );
@@ -258,14 +259,14 @@ function initUI()
 	{
 		ui.levelsMenu.add( new UI.Button( "Level " + ( i + 1 ),
 			levelOnclick.bind( this, i ) )
-				.position( { top: 40 * i, left: 0 } ).show() );
+				.position( { top: 40 * ( i % 4 ), left: 175 * Math.floor( i / 4 ) } ).show() );
 	}
 	ui.levelsMenu.add( new UI.Button( "BACK",
 		function()
 		{
 			ui.levelsMenu.hide();
 			ui.storyMenu.show();
-		} ).position( { top: levels.length * 40 + 40, left: 0 } ).show() );
+		} ).position( { top: 5 * 40, left: 0 } ).show() );
 
 	ui.levelCreationMenu = new UI.Group()
 		.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );
@@ -328,7 +329,17 @@ function initUI()
 		{
 			changeState( GameState.Unknown );
 			loadLevel( ++currentLevel );
-		}, ui.ingameMenu ).position( { top: 0, left: 130 } );
+		}, ui.ingameMenu ).position( { top: 0, left: 135 } );
+
+	ui.ingameMenu.undoButton = new UI.Button( "Undo",
+		function()
+		{
+			if( visibilityPolygons.length > 0 )
+			{
+				polygonMeshes.remove( visibilityPolygonMeshes.pop() );
+				visibilityPolygons.pop();
+			}
+		}, ui.ingameMenu ).position( { top: 0, left: 135 } ).show();
 
 	ui.completionText = new UI.Text( "Level completed!" )
 		.position( { top: 100, left: 100 } ).cssClass( "title" );
@@ -742,37 +753,116 @@ function onMouseDown( event )
 			var color = Math.floor( 0xffffff * Math.random() );
 			var visPolyMesh = createTriangulationMesh(
 				visPolyTri, basicMaterial, color );
-//			visPolyMesh.position.set(
-//				0, 0, ( ++cameraIndex ) * WALLHEIGHT / 100.0 );
+			visPolyMesh.position.set(
+				0, 0, ( ++cameraIndex ) * WALLHEIGHT / 100.0 );
+			visibilityPolygonMeshes.push( visPolyMesh );
 
-			polygonMeshes.add( visPolyMesh );
 
 			var cameraMesh = createCameraMesh( p, color );
-			polygonMeshes.add( cameraMesh );
+			visPolyMesh.add( cameraMesh );
+			polygonMeshes.add( visPolyMesh );
 
-			// TODO/HACK
-			if( visibilityPolygons.length == 2 )
-			{
-				var color = new THREE.Color( 0xffffff );
-				var intersection = intersectSimplePolygonsDCEL(
-					visibilityPolygons[ 0 ], visibilityPolygons[ 1 ] );
+//			// TODO/HACK
+//			if( visibilityPolygons.length == 2 )
+//			{
+//				var color = new THREE.Color( 0xffffff );
+//				var intersection = intersectSimplePolygonsDCEL(
+//					visibilityPolygons[ 0 ], visibilityPolygons[ 1 ] );
+//
+//				var obj = new THREE.Object3D();
+//				visualizeDCEL( intersection.faces[ 0 ], color, obj );
+//				polygonMeshes.add( obj );
+//			}
 
-				var obj = new THREE.Object3D();
-				visualizeDCEL( intersection.faces[ 0 ], color, obj );
-				polygonMeshes.add( obj );
-			}
-
-			// TODO/HACK
-			if( Math.abs( visPolyDCEL.faces[ 0 ].area() - dcel.faces[ 0 ].area() ) < 0.01 )
-			{
-				changeState( GameState.LevelCompleted );
-			}
+			checkCompletion();
 		}
 		else
 		{
 			probeMesh.material.color.setHex( 0xff0000 );
 		}
 	}
+}
+
+function checkCompletion()
+{
+		var unionArea = areaOfUnion( visibilityPolygons );
+
+		console.log( unionArea + " / " + dcel.faces[ 0 ].area() );
+
+	// TODO/HACK
+	//if( Math.abs( unionArea - dcel.faces[ 0 ].area() ) < 0.01 )
+	if( unionArea >= dcel.faces[ 0 ].area() - 0.01 )
+	{
+		changeState( GameState.LevelCompleted );
+	}
+}
+
+function areaOfUnion( polygons )
+{
+	function areaOfUnionRec( polygons, indices, depth, maxDepth )
+	{
+		if( depth === maxDepth )
+		{
+			var tmp = "";
+			var polys = new Array( maxDepth );
+			for( var i = 0; i < polys.length; ++i )
+			{
+				polys[ i ] = polygons[ indices[ i ] ];
+				tmp += indices[ i ] + ", ";
+			}
+			var ret = areaOfIntersection( polys );
+			console.log( tmp + "-> " + ret );
+			return ret;
+		}
+		else
+		{
+			var start = ( depth > 0 ? indices[ depth - 1 ] + 1 : 0 );
+			var sum = 0;
+			for( var i = start; i < polygons.length; ++i )
+			{
+				indices[ depth ] = i;
+				sum += areaOfUnionRec( polygons, indices, depth + 1, maxDepth );
+			}
+			return sum;
+		}
+	}
+
+	var indices = new Array( polygons.length );
+	var sum = 0;
+	for( var i = 1; i <= polygons.length; ++i )
+	{
+		if( i % 2 !== 0 )
+		{
+			console.log( "+" );
+			sum += areaOfUnionRec( polygons, indices, 0, i );
+		}
+		else
+		{
+			console.log( "-" );
+			sum -= areaOfUnionRec( polygons, indices, 0, i );
+		}
+	}
+
+	return sum;
+}
+
+function areaOfIntersection( polygons )
+{
+	var intermediate = polygons[ 0 ];
+	for( var i = 1; i < polygons.length; ++i )
+	{
+		intermediate =
+			intersectSimplePolygonsDCEL( intermediate, polygons[ i ] );
+		if( intermediate === null )
+		{
+			return 0;
+		}
+//		if( polygons.length === 2 && i === 1 || polygons.length === 3 && i == 2 )
+//		{
+//			addDCELFaceMesh( intermediate.faces[ 0 ] );
+//		}
+	}
+	return intermediate.faces[ 0 ].area();
 }
 
 function createCameraMesh( pos, _color )
@@ -814,6 +904,16 @@ function changeState( s )
 	{
 		ui.completionText.hide();
 		ui.ingameMenu.nextButton.hide();
+
+		visibilityPolygons.length = 0;
+		visibilityPolygonMeshes.length = 0;
+	}
+	else if( state == GameState.CameraPlacement )
+	{
+		visibilityPolygons.length = 0;
+		visibilityPolygonMeshes.length = 0;
+
+		ui.ingameMenu.undoButton.hide();
 	}
 
 	if( s == state )
@@ -852,6 +952,7 @@ function changeState( s )
 	else if( s == GameState.CameraPlacement )
 	{
 		ui.ingameMenu.show();
+		ui.ingameMenu.undoButton.show();
 	}
 	else if( s == GameState.LevelCompleted )
 	{
@@ -917,6 +1018,15 @@ function visualizeDCEL( face, color, obj )
 
 		iter = iter.next;
 	} while( iter !== face.edge );
+}
+
+function addDCELFaceMesh( face )
+{
+	var color = new THREE.Color( Math.floor( 0xffffff * Math.random() ) );
+
+	var obj = new THREE.Object3D();
+	visualizeDCEL( face, color, obj );
+	polygonMeshes.add( obj );
 }
 
 function placePictures()
