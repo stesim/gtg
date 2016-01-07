@@ -142,6 +142,18 @@ UI.Control.prototype.hide = function()
 	return this;
 }
 
+UI.Control.prototype.visible = function( val )
+{
+	if( val )
+	{
+		this.show();
+	}
+	else
+	{
+		this.hide();
+	}
+}
+
 UI.Control.prototype.disable = function()
 {
 	this.elem.disabled = true;

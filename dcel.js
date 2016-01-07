@@ -131,17 +131,17 @@ DCEL.prototype.fromVectorList = function( vectors )
 
 DCEL.prototype.clearTemp = function()
 {
-	for( var edge in this.edges )
+	for( var i = 0; i < this.edges.length; ++i )
 	{
-		edge.temp = null;
+		this.edges[ i ].temp = null;
 	}
-	for( var vertex in this.vertices )
+	for( var i = 0; i < this.vertices.length; ++i )
 	{
-		vertex.temp = null;
+		this.vertices[ i ].temp = null;
 	}
-	for( var face in this.faces )
+	for( var i = 0; i < this.faces.length; ++i )
 	{
-		face.temp = null;
+		this.faces[ i ].temp = null;
 	}
 }
 
@@ -319,6 +319,11 @@ HalfEdge.prototype.length = function()
 	}
 
 	return this.origin.pos.distanceTo( this.next.origin.pos );
+}
+
+HalfEdge.prototype.pointDistance = function( p )
+{
+	return this.normal().dot( p.clone().sub( this.origin.pos ) );
 }
 
 //function triangulateSimplePolygonDCEL( dcel )
