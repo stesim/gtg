@@ -6,6 +6,7 @@ var graphics =
 	scene: null,
 	renderer: null,
 	renderingEnabled: true,
+	updateFunc: null,
 
 	topView:
 	{
@@ -57,12 +58,14 @@ var graphics =
 	floorMaterial: null,
 	levelMeshes: null,
 	visbilityMaterial: null,
-	spotlight: null,
+	lookDirArrow: null,
 
-	init: function()
+	init: function( updateFunc )
 	{
 		graphics.WIDTH = window.innerWidth;
 		graphics.HEIGHT = window.innerHeight;
+
+		graphics.updateFunc = updateFunc;
 
 		graphics.scene = new THREE.Scene();
 
@@ -103,7 +106,7 @@ var graphics =
 		light.position.set( 0, 0, 500 );
 		graphics.scene.add( light );
 
-		var ambientLight = new THREE.AmbientLight( 0x333366 );
+		var ambientLight = new THREE.AmbientLight( 0x6666aa );
 		graphics.scene.add( ambientLight );
 
 		graphics.wallMaterial =
@@ -111,6 +114,7 @@ var graphics =
 				color: 0x333333,
 				specular: 0xffffff,
 				shininess: 5,
+				side: THREE.DoubleSide,
 			} );
 
 		graphics.floorMaterial = graphics.wallMaterial;
@@ -124,15 +128,14 @@ var graphics =
 		graphics.visibilityMaterial.opacity = 0.5;
 		graphics.visibilityMaterial.needsUpdate = true;
 
-		var spotlightTarget = new THREE.Object3D();
-		spotlightTarget.position.set( 0, 0, -1 );
-		graphics.fxView.camera.add( spotlightTarget );
-
-		graphics.spotlight = new THREE.SpotLight( 0xffffff, 0.5 );
-		graphics.spotlight.exponent = 7.5;
-		graphics.spotlight.target = spotlightTarget;
-		graphics.scene.add( graphics.spotlight );
-		//graphics.spotlight.visible = false;
+		graphics.lookDirArrow = new THREE.ArrowHelper(
+			new THREE.Vector3( 0, 0, -1 ),
+			new THREE.Vector3( 0, 100, 0 ),
+			50,
+			0xffffff,
+			30,
+			20 );
+		graphics.fxView.camera.add( graphics.lookDirArrow );
 	},
 
 	resetFxCamera: function()
@@ -157,6 +160,11 @@ var graphics =
 
 	render: function()
 	{
+		if( graphics.updateFunc !== null )
+		{
+			graphics.updateFunc();
+		}
+
 		if( graphics.renderingEnabled )
 		{
 			//stats.begin();

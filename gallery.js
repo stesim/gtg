@@ -14,6 +14,7 @@ var dragging =
 	last: null,
 	//delta: null,
 };
+var keymap = {};
 
 var currentLevel = 0;
 var cameraIndex = 0;
@@ -24,6 +25,7 @@ var guards = new Array();
 var pictures = new Array();
 
 var isInFirstPerson = false;
+var firstPersonGuard = null;
 var lastFxCamRotation = 0.0;
 var pickedGuard = null;
 
@@ -31,7 +33,8 @@ function Guard()
 {
 	this.position = null;
 	this.polygon = null;
-	this.mesh = null;
+	this.cameraMesh = null;
+	this.visibilityMesh = null;
 	this.color = null;
 }
 
@@ -60,7 +63,7 @@ function init()
 
 	time = new THREE.Clock( true );
 
-	graphics.init();
+	graphics.init( update );
 
 	probeMesh = new THREE.Mesh(
 		new THREE.SphereGeometry( 10, 16, 16 ),
@@ -74,11 +77,124 @@ function init()
 	graphics.renderer.domElement.
 		addEventListener( "mouseup", onMouseUp, false );
 
+	document.addEventListener( "keydown", onKeyDown, false );
+	document.addEventListener( "keyup", onKeyUp, false );
+
 	ui.init();
 
 	GameState.set( GameStates.Menu );
 
 	graphics.render();
+}
+
+function onKeyDown( event )
+{
+	event = event || window.event;
+	var key = String.fromCharCode( event.keyCode );
+
+	keymap[ key ] = true;
+}
+
+function onKeyUp( event )
+{
+	event = event || window.event;
+	var key = String.fromCharCode( event.keyCode );
+
+	keymap[ key ] = false;
+}
+
+function isKeyDown( key )
+{
+	return keymap[ key ];
+}
+
+function update()
+{
+	function handleCameraWallCollision( prevPosition )
+	{
+		var newPosition = new THREE.Vector2(
+			graphics.fxView.camera.position.x,
+			graphics.fxView.camera.position.y );
+		var delta = newPosition.clone().sub( prevPosition );
+
+		var closestIntersection = null;
+		var intersectedEdge = null;
+
+		for( var i = 0; i < dcel.edges.length; ++i )
+		{
+			var edge = dcel.edges[ i ];
+			if( delta.dot( edge.normal() ) < 0.0 )
+			{
+				var intersection = extendedLineIntersection(
+					prevPosition, newPosition,
+					edge.origin.pos, edge.next.origin.pos );
+
+				if( intersection !== null &&
+					intersection[ 1 ] >= 0.0 && intersection[ 1 ] <= 1.0 &&
+					intersection[ 2 ] >= 0.0 && intersection[ 2 ] <= 1.0 &&
+					( closestIntersection === null ||
+					  intersection[ 1 ] < closestIntersection[ 1 ] ) )
+				{
+					closestIntersection = intersection;
+					intersectedEdge = edge;
+				}
+			}
+		}
+
+		if( closestIntersection !== null )
+		{
+			var deltaOutside =
+				newPosition.clone().sub( closestIntersection[ 0 ] );
+			var edgeVec = intersectedEdge.vector();
+			var outsideProj = deltaOutside.dot( edgeVec ) / edgeVec.lengthSq();
+			var finalLocalPos = closestIntersection[ 2 ] + outsideProj;
+
+			finalLocalPos = Math.min( Math.max( finalLocalPos, 0.0 ), 1.0 );
+
+			var finalPos = intersectedEdge.lerp( finalLocalPos );
+
+			graphics.fxView.camera.position.x = finalPos.x;
+			graphics.fxView.camera.position.y = finalPos.y;
+
+//			graphics.fxView.camera.position.x = closestIntersection[ 0 ].x;
+//			graphics.fxView.camera.position.y = closestIntersection[ 0 ].y;
+		}
+	}
+
+	var translateDistance = ( time.getDelta() * 100.0 );
+	if( isInFirstPerson )
+	{
+		var cameraMoved = false;
+		var prevPosition = new THREE.Vector2(
+			graphics.fxView.camera.position.x,
+			graphics.fxView.camera.position.y );
+		if( isKeyDown( 'W' ) && !isKeyDown( 'S' ) )
+		{
+			graphics.fxView.camera.translateZ( -translateDistance );
+			cameraMoved = true;
+		}
+		else if( isKeyDown( 'S' ) )
+		{
+			graphics.fxView.camera.translateZ( translateDistance );
+			cameraMoved = true;
+		}
+
+		if( isKeyDown( 'A' ) && !isKeyDown( 'D' ) )
+		{
+			graphics.fxView.camera.translateX( -translateDistance );
+			cameraMoved = true;
+		}
+		else if( isKeyDown( 'D' ) )
+		{
+			graphics.fxView.camera.translateX( translateDistance );
+			cameraMoved = true;
+		}
+
+		if( cameraMoved )
+		{
+			handleCameraWallCollision( prevPosition );
+		}
+	}
 }
 
 function restart()
@@ -257,11 +373,11 @@ function createPolygonMeshes()
 {
 	if( polygon.length <= 0 ) { return; }
 
-	graphics.levelMeshes.add( createPillar( polygon[ 0 ] ) );
+	//graphics.levelMeshes.add( createPillar( polygon[ 0 ] ) );
 
 	for( var i = 1; i < polygon.length; ++i )
 	{
-		graphics.levelMeshes.add( createPillar( polygon[ i ] ) );
+		//graphics.levelMeshes.add( createPillar( polygon[ i ] ) );
 		graphics.levelMeshes.add( createWall( polygon[ i - 1 ], polygon[ i ] ) );
 	}
 
@@ -295,9 +411,11 @@ function createWall( start, end )
 	var length = diff.length();
 
 	var wall = new THREE.Mesh(
-		new THREE.BoxGeometry( length, WALLWIDTH, WALLHEIGHT ),
+//		new THREE.BoxGeometry( length, WALLWIDTH, WALLHEIGHT ),
+		new THREE.PlaneGeometry( length, WALLHEIGHT ),
 		graphics.wallMaterial );
-	wall.rotation.set( 0, 0, Math.atan2( diff.y, diff.x ) );
+	wall.rotation.order = "ZXY";
+	wall.rotation.set( Math.PI / 2, 0, Math.atan2( diff.y, diff.x ) );
 	wall.position.set( center.x, center.y, WALLHEIGHT / 2 );
 
 	return wall;
@@ -316,12 +434,26 @@ function createPillar( pos )
 
 function addOrMoveGuard( guard, p )
 {
-	if( guard !== null )
+	if( guard === null )
+	{
+		guard = new Guard();
+		guards.push( guard );
+
+		guard.color = Math.floor( 0xffffff * Math.random() );
+		guard.guardMesh = createCameraMesh( p, guard.color );
+
+		graphics.levelMeshes.add( guard.guardMesh );
+	}
+	else
 	{
 		removePictureVisibilityFrom( guard.polygon );
 
-		graphics.levelMeshes.remove( guard.mesh );
+		graphics.levelMeshes.remove( guard.visibilityMesh );
+
+		guard.guardMesh.position.set( p.x, p.y, 0 );
 	}
+
+	guard.position = p;
 
 	var polyPoints = new Array();
 	var iter = dcel.edges[ 0 ];
@@ -346,31 +478,15 @@ function addOrMoveGuard( guard, p )
 			visibilityPoints[ i ][ 1 ] );
 	}
 
-	var visPolyDCEL = new DCEL().fromVectorList( visibilityPoints );
+	guard.polygon = new DCEL().fromVectorList( visibilityPoints );
 
-	var visPolyTri = triangulateSimplePolygon( visPolyDCEL );
+	var visPolyTri = triangulateSimplePolygon( guard.polygon );
 
-	var color = ( guard !== null ? guard.color : Math.floor( 0xffffff * Math.random() ) );
+	guard.visibilityMesh = createTriangulationMesh(
+		visPolyTri, graphics.visibilityMaterial, guard.color );
+	guard.visibilityMesh.position.set( 0, 0, ( ++cameraIndex ) * 0.02 );
 
-	var visPolyMesh = createTriangulationMesh(
-		visPolyTri, graphics.visibilityMaterial, color );
-	visPolyMesh.position.set(
-		0, 0, ( ++cameraIndex ) * 0.02 );
-
-	var cameraMesh = createCameraMesh( p, color );
-	visPolyMesh.add( cameraMesh );
-	graphics.levelMeshes.add( visPolyMesh );
-
-	if( guard === null )
-	{
-		guard = new Guard();
-		guards.push( guard );
-	}
-
-	guard.position = p;
-	guard.polygon = visPolyDCEL;
-	guard.mesh = visPolyMesh;
-	guard.color = color;
+	graphics.levelMeshes.add( guard.visibilityMesh );
 
 	addPictureVisibilityFrom( guard.polygon );
 }
@@ -379,7 +495,9 @@ function removeGuard( guard )
 {
 	removePictureVisibilityFrom( guard.polygon );
 
-	graphics.levelMeshes.remove( guard.mesh );
+	graphics.levelMeshes.remove( guard.guardMesh );
+	graphics.levelMeshes.remove( guard.visibilityMesh );
+
 	guards.splice( guards.indexOf( guard ), 1 );
 }
 
@@ -444,8 +562,10 @@ function onMouseUp( event )
 			graphics.levelMeshes.add(
 				createWall( polygon[ polygon.length - 2 ], p ) );
 		}
-
-		graphics.levelMeshes.add( createPillar( p ) );
+		else
+		{
+			graphics.levelMeshes.add( createPillar( p ) );
+		}
 	}
 	else if( GameState.get() === GameStates.GuardPlacement )
 	{
@@ -484,6 +604,15 @@ function onMouseUp( event )
 			}
 			pickedGuard = null;
 		}
+		else if( !dragging.effective )
+		{
+			var p = graphics.screenToWorldPosition( coord );
+			if( p !== null && dcel.faces[ 0 ].contains( p ) )
+			{
+				graphics.fxView.camera.position.x = p.x;
+				graphics.fxView.camera.position.y = p.y;
+			}
+		}
 	}
 }
 
@@ -500,13 +629,15 @@ function onMouseDrag( event )
 
 	if( isInFirstPerson )
 	{
-		graphics.fxView.camera.rotation.y = ( lastFxCamRotation - diff.x / 180.0 );
+		graphics.fxView.camera.rotation.y =
+			( lastFxCamRotation - diff.x / 250.0 );
 	}
 }
 
 function switchToFirstPerson( guard )
 {
 	isInFirstPerson = true;
+	firstPersonGuard = guard;
 
 	graphics.fxView.camera.position.set(
 		guard.position.x,
@@ -515,8 +646,9 @@ function switchToFirstPerson( guard )
 	graphics.fxView.camera.rotation.set( Math.PI / 2, lastFxCamRotation, 0 );
 	graphics.fxView.camera.up.set( 0, 0, 1 );
 
-	graphics.spotlight.position.copy( graphics.fxView.camera.position );
-	graphics.spotlight.visible = true;
+	graphics.levelMeshes.remove( guard.guardMesh );
+	guard.guardMesh.position.set( 0, 0, 0 );
+	graphics.fxView.camera.add( guard.guardMesh );
 
 	ui.ingameMenu.overviewButton.show();
 }
@@ -525,11 +657,19 @@ function switchToOverview()
 {
 	ui.ingameMenu.overviewButton.hide();
 
-	isInFirstPerson = false;
+	var guard = firstPersonGuard;
 
-	graphics.spotlight.visible = false;
+	graphics.fxView.camera.remove( guard.guardMesh );
+	addOrMoveGuard( firstPersonGuard,
+		new THREE.Vector2(
+			graphics.fxView.camera.position.x,
+			graphics.fxView.camera.position.y ) );
+	graphics.levelMeshes.add( guard.guardMesh );
 
 	graphics.resetFxCamera();
+
+	isInFirstPerson = false;
+	firstPersonGuard = null;
 }
 
 function startDragging( coord )
@@ -821,7 +961,7 @@ function placePictures()
 			pos += 0.5 * size;
 
 			var height = 0.5 * WALLHEIGHT;
-			var normal = iter.normal().multiplyScalar( WALLWIDTH * 0.53 );
+			var normal = iter.normal().multiplyScalar( 0.5 );
 			var dir = iter.direction();
 			var vecPos = iter.lerp( pos / wallLength ).add( normal );
 
