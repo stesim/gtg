@@ -4,6 +4,8 @@ var PILLARHEIGHT = 103;
 var PICTUREOFFSETMIN = 30;
 var PICTUREOFFSETMAX = 150;
 
+var ZAXIS = new THREE.Vector3( 0, 0, 1 );
+
 var stats, svgContainer;
 var time;
 var probeMesh;
@@ -27,6 +29,9 @@ var pictures = new Array();
 var isInFirstPerson = false;
 var firstPersonGuard = null;
 var lastFxCamRotation = 0.0;
+var lastOverviewCamRotation = 0.0;
+var lastOverviewCamPosition = new THREE.Vector3( 0, 0, 700 );
+var moveOverviewByDrag = true;
 var pickedGuard = null;
 
 function Guard()
@@ -197,12 +202,25 @@ function update()
 	}
 }
 
+function resetFxCamera()
+{
+	graphics.fxView.camera.up.set( 0, 1, 0 );
+	graphics.fxView.camera.position.copy( lastOverviewCamPosition );
+	graphics.fxView.camera.rotation.set( 0, 0, 0 );
+	//graphics.fxView.camera.lookAt( graphics.scene.position );
+}
+
 function restart()
 {
 	polygon.length = 0;
 	graphics.clearLevelMeshes();
 
-	graphics.resetFxCamera();
+	resetFxCamera();
+	lastFxCamRotation = 0;
+	lastOverviewCamRotation = 0;
+	lastOverviewCamPosition.set( 0, 0, 700 );
+
+	ui.hint.cancel();
 
 	probeMesh.visible = false;
 
@@ -257,6 +275,28 @@ function loadLevel( level )
 	currentLevel = level;
 
 	GameState.set( GameStates.GuardPlacement );
+
+	// TODO: implement hints in level description
+	var hint = null;
+	switch( level )
+	{
+		case 0:
+			hint = "Place guards to guard the art by clicking inside the gallery.";
+			break;
+		case 2:
+			hint = "If you cannot see some of the art, try moving the camera by holding the left mouse button and moving the mouse.";
+			break;
+		case 4:
+			hint = "Sometimes one guard may not be enough to cover all the valuable art.";
+			break;
+		case 6:
+			hint = "A guard you placed turned out to be less useful than expected? If the cursor is on a guard when pressing the mouse button, that guard will be moved instead of the camera. Moving guards to the outside of the gallery removes them.";
+			break;
+	}
+	if( hint !== null )
+	{
+		ui.hint.display( hint, 10 );
+	}
 }
 
 function importLevel( parser, data )
@@ -541,12 +581,24 @@ function onMouseUp( event )
 
 	if( dragging.active )
 	{
-		stopDragging();
-
 		if( isInFirstPerson )
 		{
 			lastFxCamRotation = graphics.fxView.camera.rotation.y;
 		}
+		else
+		{
+			if( moveOverviewByDrag )
+			{
+				lastOverviewCamPosition.copy( graphics.fxView.camera.position );
+			}
+			else
+			{
+				lastOverviewCamRotation -=
+					( dragging.last.x - dragging.start.x ) / 250.0;
+			}
+		}
+
+		stopDragging();
 	}
 
 	if( GameState.get() === GameStates.LevelEditing &&
@@ -571,7 +623,7 @@ function onMouseUp( event )
 	{
 		if( !isInFirstPerson )
 		{
-			if( pickedGuard === null )
+			if( pickedGuard === null && !dragging.effective )
 			{
 				var p = graphics.screenToWorldPosition( coord );
 				if( p === null ) { return; }
@@ -587,7 +639,7 @@ function onMouseUp( event )
 			{
 				switchToFirstPerson( pickedGuard );
 			}
-			else
+			else if( pickedGuard !== null )
 			{
 				var p = graphics.screenToWorldPosition( coord );
 				if( p === null ) { return; }
@@ -632,6 +684,23 @@ function onMouseDrag( event )
 		graphics.fxView.camera.rotation.y =
 			( lastFxCamRotation - diff.x / 250.0 );
 	}
+	else if( pickedGuard === null )
+	{
+		if( moveOverviewByDrag )
+		{
+			graphics.fxView.camera.position.x =
+				( lastOverviewCamPosition.x - diff.x );
+			graphics.fxView.camera.position.y =
+				( lastOverviewCamPosition.y - diff.y );
+		}
+		else
+		{
+			graphics.fxView.camera.position.set( 0, -200, 700 ).applyAxisAngle(
+				ZAXIS, lastOverviewCamRotation - diff.x / 250.0 );
+			graphics.fxView.camera.lookAt( graphics.scene.position );
+		}
+
+	}
 }
 
 function switchToFirstPerson( guard )
@@ -666,7 +735,7 @@ function switchToOverview()
 			graphics.fxView.camera.position.y ) );
 	graphics.levelMeshes.add( guard.guardMesh );
 
-	graphics.resetFxCamera();
+	resetFxCamera();
 
 	isInFirstPerson = false;
 	firstPersonGuard = null;

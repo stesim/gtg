@@ -79,7 +79,7 @@ var graphics =
 			1.0 / graphics.topView.viewport.width,
 			1.0 / graphics.topView.viewport.height ) + 1;
 
-		graphics.resetFxCamera();
+		//graphics.resetFxCamera();
 		graphics.fxView.update();
 		graphics.scene.add( graphics.fxView.camera );
 
@@ -136,14 +136,6 @@ var graphics =
 			30,
 			20 );
 		graphics.fxView.camera.add( graphics.lookDirArrow );
-	},
-
-	resetFxCamera: function()
-	{
-		graphics.fxView.camera.up.set( 0, 1, 0 );
-		graphics.fxView.camera.position.set( 0, 0, 700 );
-		//graphics.fxView.camera.rotation;//.set( 0, Math.PI, Math.PI );
-		graphics.fxView.camera.lookAt( graphics.scene.position );
 	},
 
 	enableRendering: function()

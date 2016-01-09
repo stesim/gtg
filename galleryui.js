@@ -22,6 +22,7 @@ var ui =
 		ui.mainMenu.add( new UI.Button( "Versus Mode",
 			function()
 			{
+				ui.hint.display( "Versus Mode is not available yet.", 5 );
 			} ).position( { top: 40, left: 0 } ).show().disable() );
 
 		ui.mainMenu.show();
@@ -155,5 +156,51 @@ var ui =
 
 		ui.completionText = new UI.Text( "Level completed!" )
 			.position( { top: 100, left: 100 } ).cssClass( "title" );
+
+
+		ui.hint = new UI.Text( "" )
+			.position( { top: 15, right: 15 } ).cssClass( "hint" );
+		ui.hint.active = false;
+		ui.hint.timeout = null;
+
+		ui.hint.display = function( content, duration )
+		{
+			if( this.timeout !== null )
+			{
+				clearTimeout( this.timeout );
+				this.timeout = null;
+			}
+
+			this.text( content ).show();
+
+			if( duration )
+			{
+				this.timeout = setTimeout( (
+					function()
+					{
+						this.cancel();
+					} ).bind( this ),
+					duration * 1000 );
+			}
+
+			this.active = true;
+		}
+
+		ui.hint.cancel = function()
+		{
+			if( ui.hint.timeout !== null )
+			{
+				clearTimeout( ui.hint.timeout );
+				ui.hint.timeout = null;
+			}
+
+			ui.active = false;
+			ui.hint.hide();
+		}
+
+		ui.hint.elem.onclick = function()
+		{
+			ui.hint.cancel();
+		}
 	}
 }
