@@ -495,30 +495,32 @@ function addOrMoveGuard( guard, p )
 
 	guard.position = p;
 
-	var polyPoints = new Array();
-	var iter = dcel.edges[ 0 ];
-	do
-	{
-		polyPoints.push( [ iter.origin.pos.x, iter.origin.pos.y ] );
-		iter = iter.next;
-	} while( iter !== dcel.edges[ 0 ] );
+//	var polyPoints = new Array();
+//	var iter = dcel.edges[ 0 ];
+//	do
+//	{
+//		polyPoints.push( [ iter.origin.pos.x, iter.origin.pos.y ] );
+//		iter = iter.next;
+//	} while( iter !== dcel.edges[ 0 ] );
+//
+//	var segments =
+//		VisibilityPolygon.convertToSegments( [ polyPoints ] );
+//
+//	var position = [ p.x, p.y ];
+//
+//	var visibilityPoints =
+//		VisibilityPolygon.compute( position, segments );
+//
+//	for( var i = 0; i < visibilityPoints.length; ++i )
+//	{
+//		visibilityPoints[ i ] = new THREE.Vector2(
+//			visibilityPoints[ i ][ 0 ],
+//			visibilityPoints[ i ][ 1 ] );
+//	}
+//
+//	guard.polygon = new DCEL().fromVectorList( visibilityPoints );
 
-	var segments =
-		VisibilityPolygon.convertToSegments( [ polyPoints ] );
-
-	var position = [ p.x, p.y ];
-
-	var visibilityPoints =
-		VisibilityPolygon.compute( position, segments );
-
-	for( var i = 0; i < visibilityPoints.length; ++i )
-	{
-		visibilityPoints[ i ] = new THREE.Vector2(
-			visibilityPoints[ i ][ 0 ],
-			visibilityPoints[ i ][ 1 ] );
-	}
-
-	guard.polygon = new DCEL().fromVectorList( visibilityPoints );
+	guard.polygon = visibility( dcel, p );
 
 	var visPolyTri = triangulateSimplePolygon( guard.polygon );
 
