@@ -482,31 +482,6 @@ function addOrMoveGuard( guard, p )
 
 	guard.position = p;
 
-//	var polyPoints = new Array();
-//	var iter = dcel.edges[ 0 ];
-//	do
-//	{
-//		polyPoints.push( [ iter.origin.pos.x, iter.origin.pos.y ] );
-//		iter = iter.next;
-//	} while( iter !== dcel.edges[ 0 ] );
-//
-//	var segments =
-//		VisibilityPolygon.convertToSegments( [ polyPoints ] );
-//
-//	var position = [ p.x, p.y ];
-//
-//	var visibilityPoints =
-//		VisibilityPolygon.compute( position, segments );
-//
-//	for( var i = 0; i < visibilityPoints.length; ++i )
-//	{
-//		visibilityPoints[ i ] = new THREE.Vector2(
-//			visibilityPoints[ i ][ 0 ],
-//			visibilityPoints[ i ][ 1 ] );
-//	}
-//
-//	guard.polygon = new DCEL().fromVectorList( visibilityPoints );
-
 	guard.polygon = visibility( dcel, p );
 
 	var visPolyTri = triangulateSimplePolygon( guard.polygon );
@@ -802,17 +777,6 @@ function removePictureVisibilityFrom( polygon )
 
 function checkCompletion()
 {
-//	var unionArea = areaOfUnion( visibilityPolygons );
-//
-//	console.log( unionArea + " / " + dcel.faces[ 0 ].area() );
-//
-//	// TODO/HACK
-//	//if( Math.abs( unionArea - dcel.faces[ 0 ].area() ) < 0.01 )
-//	if( unionArea >= dcel.faces[ 0 ].area() - 0.01 )
-//	{
-//		GameState.set( GameStates.LevelCompleted );
-//	}
-
 	var completed = true;
 	for( var i = 0; i < pictures.length; ++i )
 	{
