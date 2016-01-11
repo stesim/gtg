@@ -1,7 +1,5 @@
 function visibility( dcel, p )
 {
-	var eps = 0.00001;
-
 	function angle( p )
 	{
 		return Math.atan2( p.y, p.x );

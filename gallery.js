@@ -120,30 +120,17 @@ function update()
 		var newPosition = new THREE.Vector2(
 			graphics.fxView.camera.position.x,
 			graphics.fxView.camera.position.y );
-		var delta = newPosition.clone().sub( prevPosition );
+
+		var halfLineIntersection = findClosestDCELHalfLineIntersection(
+			dcel, prevPosition, newPosition );
 
 		var closestIntersection = null;
 		var intersectedEdge = null;
-
-		for( var i = 0; i < dcel.edges.length; ++i )
+		if( halfLineIntersection !== null &&
+			halfLineIntersection.intersection[ 1 ] < ( 1 + eps ) )
 		{
-			var edge = dcel.edges[ i ];
-			if( delta.dot( edge.normal() ) < 0.0 )
-			{
-				var intersection = extendedLineIntersection(
-					prevPosition, newPosition,
-					edge.origin.pos, edge.next.origin.pos );
-
-				if( intersection !== null &&
-					intersection[ 1 ] >= 0.0 && intersection[ 1 ] <= 1.0 &&
-					intersection[ 2 ] >= 0.0 && intersection[ 2 ] <= 1.0 &&
-					( closestIntersection === null ||
-					  intersection[ 1 ] < closestIntersection[ 1 ] ) )
-				{
-					closestIntersection = intersection;
-					intersectedEdge = edge;
-				}
-			}
+			closestIntersection = halfLineIntersection.intersection;
+			intersectedEdge = halfLineIntersection.edge;
 		}
 
 		if( closestIntersection !== null )
