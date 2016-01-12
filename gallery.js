@@ -43,8 +43,9 @@ function Guard()
 	this.color = null;
 }
 
-function Picture( start, end, mesh )
+function Picture( id, start, end, mesh )
 {
+	this.id = id;
 	this.start = start;
 	this.end = end;
 	this.visibleFrom = null;
@@ -81,6 +82,8 @@ function init()
 		addEventListener( "mousedown", onMouseDown, false );
 	graphics.renderer.domElement.
 		addEventListener( "mouseup", onMouseUp, false );
+	graphics.renderer.domElement.
+		addEventListener( "mousewheel", onMouseScroll, false );
 
 	document.addEventListener( "keydown", onKeyDown, false );
 	document.addEventListener( "keyup", onKeyUp, false );
@@ -400,11 +403,8 @@ function createPolygonMeshes()
 {
 	if( polygon.length <= 0 ) { return; }
 
-	//graphics.levelMeshes.add( createPillar( polygon[ 0 ] ) );
-
 	for( var i = 1; i < polygon.length; ++i )
 	{
-		//graphics.levelMeshes.add( createPillar( polygon[ i ] ) );
 		graphics.levelMeshes.add( createWall( polygon[ i - 1 ], polygon[ i ] ) );
 	}
 
@@ -438,7 +438,6 @@ function createWall( start, end )
 	var length = diff.length();
 
 	var wall = new THREE.Mesh(
-//		new THREE.BoxGeometry( length, WALLWIDTH, WALLHEIGHT ),
 		new THREE.PlaneGeometry( length, WALLHEIGHT ),
 		graphics.wallMaterial );
 	wall.rotation.order = "ZXY";
@@ -473,7 +472,7 @@ function addOrMoveGuard( guard, p )
 	}
 	else
 	{
-		removePictureVisibilityFrom( guard.polygon );
+		removePictureVisibilityFrom( guard );
 
 		graphics.levelMeshes.remove( guard.visibilityMesh );
 
@@ -481,23 +480,20 @@ function addOrMoveGuard( guard, p )
 	}
 
 	guard.position = p;
-
 	guard.polygon = visibility( dcel, p );
 
-	var visPolyTri = triangulateSimplePolygon( guard.polygon );
-
-	guard.visibilityMesh = createTriangulationMesh(
-		visPolyTri, graphics.visibilityMaterial, guard.color );
+	guard.visibilityMesh = createPolygonMesh(
+		guard.polygon, graphics.visibilityMaterial, guard.color );
 	guard.visibilityMesh.position.set( 0, 0, ( ++cameraIndex ) * 0.02 );
 
 	graphics.levelMeshes.add( guard.visibilityMesh );
 
-	addPictureVisibilityFrom( guard.polygon );
+	addPictureVisibilityFrom( guard );
 }
 
 function removeGuard( guard )
 {
-	removePictureVisibilityFrom( guard.polygon );
+	removePictureVisibilityFrom( guard );
 
 	graphics.levelMeshes.remove( guard.guardMesh );
 	graphics.levelMeshes.remove( guard.visibilityMesh );
@@ -667,6 +663,20 @@ function onMouseDrag( event )
 	}
 }
 
+function onMouseScroll( event )
+{
+	var e = window.event || event;
+	var delta = ( e.detail ? e.detail : e.wheelDelta / 120 );
+
+	if( !isInFirstPerson )
+	{
+		graphics.fxView.camera.position.z =
+			clamp( graphics.fxView.camera.position.z - delta * 50, 50, 700 );
+	}
+
+	return false;
+}
+
 function switchToFirstPerson( guard )
 {
 	isInFirstPerson = true;
@@ -703,6 +713,8 @@ function switchToOverview()
 
 	isInFirstPerson = false;
 	firstPersonGuard = null;
+
+	checkCompletion();
 }
 
 function startDragging( coord )
@@ -747,28 +759,28 @@ function isPictureOnEdge( picture, edge )
 		  isPointOnSegment( edge.next.origin.pos, picture.start, picture.end ) ) );
 }
 
-function addPictureVisibilityFrom( polygon )
+function addPictureVisibilityFrom( guard )
 {
 	for( var i = 0; i < pictures.length; ++i )
 	{
 		if( pictures[ i ].visibleFrom !== null ) { continue; }
 
-		for( var j = 0; j < polygon.edges.length; ++j )
+		for( var j = 0; j < guard.polygon.edges.length; ++j )
 		{
-			if( isPictureOnEdge( pictures[ i ], polygon.edges[ j ] ) )
+			if( isPictureOnEdge( pictures[ i ], guard.polygon.edges[ j ] ) )
 			{
-				pictures[ i ].visibleFrom = polygon;
+				pictures[ i ].visibleFrom = guard;
 				break;
 			}
 		}
 	}
 }
 
-function removePictureVisibilityFrom( polygon )
+function removePictureVisibilityFrom( guard )
 {
 	for( var i = 0; i < pictures.length; ++i )
 	{
-		if( pictures[ i ].visibleFrom === polygon )
+		if( pictures[ i ].visibleFrom === guard )
 		{
 			pictures[ i ].visibleFrom = null;
 		}
@@ -907,10 +919,8 @@ function processLevel()
 
 	placePictures();
 
-	var triDCEL = triangulateSimplePolygon( dcel );
-	
-	var groundMesh = createTriangulationMesh( triDCEL, graphics.floorMaterial );
-	graphics.levelMeshes.add( groundMesh );
+	var floorMesh = createPolygonMesh( dcel, graphics.floorMaterial );
+	graphics.levelMeshes.add( floorMesh );
 }
 
 function visualizeDCEL( face, color, obj )
@@ -968,8 +978,9 @@ function placePictures()
 		return ( r * PICTUREOFFSETMIN + ( 1 - r ) * PICTUREOFFSETMAX ); 
 	}
 
-	var texture = new THREE.TextureLoader().load( "apple.jpg" );
-	var material = new THREE.MeshPhongMaterial( { map: texture } );
+	var id = Math.floor( Math.random() * graphics.pictureMaterials.length );
+
+	var material = graphics.pictureMaterials[ id ];
 
 	var iter = dcel.edges[ 0 ];
 	do
@@ -998,6 +1009,7 @@ function placePictures()
 			graphics.levelMeshes.add( picture );
 
 			pictures.push( new Picture(
+				id,
 				iter.lerp( ( pos - 0.5 * size ) / wallLength ),
 				iter.lerp( ( pos + 0.5 * size ) / wallLength ),
 				picture ) );
@@ -1010,39 +1022,24 @@ function placePictures()
 	} while( iter != dcel.edges[ 0 ] );
 }
 
-function createTriangulationMesh( dcel, material, color )
+function createPolygonMesh( dcel, material, color )
 {
-	var geom = new THREE.Geometry();
-	for( var i = 0; i < dcel.vertices.length; ++i )
-	{
-		dcel.vertices[ i ].temp = i;
+	var shape = new THREE.Shape();
+	shape.moveTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
 
-		geom.vertices.push( new THREE.Vector3( dcel.vertices[ i ].pos.x,
-		                                       dcel.vertices[ i ].pos.y ) );
+	var iter = dcel.edges[ 0 ].next;
+	while( iter !== dcel.edges[ 0 ] )
+	{
+		shape.lineTo( iter.origin.pos.x, iter.origin.pos.y );
+
+		iter = iter.next;
 	}
+	shape.lineTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
 
-	var normal = new THREE.Vector3( 0, 0, 1 );
-
-	for( var i = 0; i < dcel.faces.length; ++i )
+	var geom = shape.makeGeometry();
+	for( var i = 0; i < geom.faces.length; ++i )
 	{
-		var e = dcel.faces[ i ].edge;
-		if( color )
-		{
-			geom.faces.push( new THREE.Face3(
-				e.origin.temp,
-				e.next.origin.temp,
-				e.next.next.origin.temp,
-				normal,
-				new THREE.Color( color ) ) );
-		}
-		else
-		{
-			geom.faces.push( new THREE.Face3(
-				e.origin.temp,
-				e.next.origin.temp,
-				e.next.next.origin.temp,
-				normal ) );
-		}
+		geom.faces[ i ].color.setHex( color );
 	}
 
 	return new THREE.Mesh( geom, material );

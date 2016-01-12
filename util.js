@@ -1,5 +1,10 @@
 var eps = 0.00001;
 
+function clamp( x, min, max )
+{
+	return ( x < min ? min : ( x > max ? max : x ) );
+}
+
 function vert2str( v )
 {
 	return ( "( " + v.pos.x + ", " + v.pos.y + " )" );

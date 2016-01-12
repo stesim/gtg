@@ -35,7 +35,7 @@ var graphics =
 	fxView:
 	{
 		background: new THREE.Color().setRGB( 0.1, 0.1, 0.1 ),
-		camera: new THREE.PerspectiveCamera( 90, 200 / 200, 0.1, 20000 ),
+		camera: new THREE.PerspectiveCamera( 90, 200 / 200, 0.1, 5000 ),
 		update: function()
 		{
 			this.camera.aspect = ( this.viewport.width * graphics.WIDTH ) /
@@ -56,9 +56,10 @@ var graphics =
 
 	wallMaterial: null,
 	floorMaterial: null,
-	levelMeshes: null,
 	visbilityMaterial: null,
+	pictureMaterials: new Array(),
 	lookDirArrow: null,
+	levelMeshes: null,
 
 	init: function( updateFunc )
 	{
@@ -123,10 +124,14 @@ var graphics =
 		graphics.scene.add( graphics.levelMeshes );
 
 		graphics.visibilityMaterial = new THREE.MeshBasicMaterial(
-			{ vertexColors: THREE.VertexColors } );
+			{ vertexColors: THREE.FaceColors } );
 		graphics.visibilityMaterial.transparent = true;
-		graphics.visibilityMaterial.opacity = 0.5;
+		graphics.visibilityMaterial.opacity = 0.2;
 		graphics.visibilityMaterial.needsUpdate = true;
+
+		var textureLoader = new THREE.TextureLoader();
+		graphics.pictureMaterials.push( new THREE.MeshPhongMaterial(
+			{ map: textureLoader.load( "apple.jpg" ) } ) );
 
 		graphics.lookDirArrow = new THREE.ArrowHelper(
 			new THREE.Vector3( 0, 0, -1 ),
@@ -135,7 +140,7 @@ var graphics =
 			0xffffff,
 			30,
 			20 );
-		graphics.fxView.camera.add( graphics.lookDirArrow );
+		//graphics.fxView.camera.add( graphics.lookDirArrow );
 	},
 
 	enableRendering: function()
