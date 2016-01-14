@@ -60,24 +60,8 @@ var GameStates =
 
 	LevelEditing: new GameState(
 		"LevelEditing",
-		function()
-		{
-			GameStates.LevelEditing.finished = false;
-
-			ui.levelCreationMenu.exportLink.hide();
-			ui.levelCreationMenu.undoButton.show();
-			ui.levelCreationMenu.finishButton.show();
-			ui.levelCreationMenu.filePicker.elem.value = null;
-			ui.levelCreationMenu.show();
-		},
-		function( newState )
-		{
-			GameStates.LevelEditing.finished = true;
-
-			ui.levelCreationMenu.hide();
-
-			restart();
-		} ),
+		LevelEditor.onLoad.bind( LevelEditor ),
+		LevelEditor.onExit.bind( LevelEditor ) ),
 
 	LevelLoading: new GameState(
 		"LevelLoading",
@@ -93,12 +77,14 @@ var GameStates =
 		function()
 		{
 			ui.ingameMenu.show();
-			//ui.ingameMenu.undoButton.show();
+			ui.levelDetails.show();
+			addGuardButtons();
+			ui.guardDetails.show();
+
+			selectGuardType( GuardTypes[ currentLevel.guardTypes[ 0 ].type ] );
 		},
 		function( newState )
 		{
-			//ui.ingameMenu.undoButton.hide();
-
 			if( isInFirstPerson )
 			{
 				switchToOverview();
@@ -107,6 +93,10 @@ var GameStates =
 			if( newState !== GameStates.LevelCompleted )
 			{
 				ui.ingameMenu.hide();
+				ui.levelDetails.hide();
+				ui.guardDetails.hide();
+				removeGuardButtons();
+
 				restart();
 			}
 		} ),
@@ -116,7 +106,7 @@ var GameStates =
 		function()
 		{
 			ui.completionText.show();
-			if( currentLevel < levels.length - 1 )
+			if( levels.indexOf( currentLevel ) < levels.length - 1 )
 			{
 				ui.ingameMenu.nextButton.show();
 			}
@@ -126,6 +116,9 @@ var GameStates =
 			ui.completionText.hide();
 			ui.ingameMenu.nextButton.hide();
 			ui.ingameMenu.hide();
+			ui.levelDetails.hide();
+			ui.guardDetails.hide();
+			removeGuardButtons();
 
 			restart();
 		} ),

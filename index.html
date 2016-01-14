@@ -6,7 +6,7 @@
 	<style>
 	button, input
 	{
-		background: #000000;
+		background: rgba( 0, 0, 0, 0.7 );
 		color: #ffffff;
 		padding: 8px 12px 12px 8px;
 		border-radius: 5px 12px;
@@ -14,13 +14,26 @@
 		text-align: left;
 		cursor: pointer;
 	}
-	button:focus, input:focus
+	input[type=text], input[type=number], textarea
+	{
+		border: solid 1px #aaaaaa;
+		cursor: auto;
+	}
+	input[type=text]:focus, input[type=number]:focus, textarea:focus
+	{
+		border-color: #aaddff;
+	}
+	input[type=text][disabled], input[type=number][disabled], textarea[disabled]
+	{
+		background: rgba( 33, 33, 33, 0.7 );
+	}
+	button:focus, input:focus, textarea:focus
 	{
 		outline: none;
 	}
-	button:active, input:active
+	button:active, input[type=file]:active
 	{
-		border: solid 1px #ffffff;
+		border: solid 1px #cccccc;
 	}
 	.verticalMenu button
 	{
@@ -45,6 +58,16 @@
 		color: #aaaaaa;
 		cursor: default;
 	}
+	a
+	{
+		color: #aaaaff;
+		text-decoration: none;
+	}
+	textarea
+	{
+		background: rgba( 0, 0, 0, 0.7 );
+		color: #ffffff;
+	}
 	.title
 	{
 		font-weight: bold;
@@ -56,15 +79,129 @@
 		color: #ffffff;
 		padding: 8px 12px 12px 8px;
 		border-radius: 5px 12px;
-		border: solid 1px #ffffff;
+		border: solid 1px #cccccc;
 		text-align: justify;
 		cursor: pointer;
 		max-width: 250px;
+	}
+	.details
+	{
+		margin: 15px;
+		text-align: center;
+	}
+	.centered
+	{
+		text-align: center;
+	}
+	.completion
+	{
+		background: rgba( 0, 0, 0, 0.75 );
+		font-weight: bold;
+		font-size: 200%;
+		text-align: center;
+		width: 100%;
+		padding: 15px;
+	}
+	.selected
+	{
+		/*background: rgba( 100, 100, 100, 0.7 );*/
+		border: solid 1px #cccccc;
+	}
+	.transparent
+	{
+		background: rgba( 0, 0, 0, 0.6 );
+	}
+	.fullwidth
+	{
+		width: 100%;
+		box-sizing: border-box;
+	}
+	#editor-title
+	{
+		position: absolute;
+		width: 100%;
+		text-align: center;
+		font-size: 200%;
+	}
+	#editor-menu
+	{
+		position: absolute;
+		top: 15px;
+		left: 15px;
+		width: 125px;
+	}
+	#editor-menu button
+	{
+		margin-bottom: 10px;
+	}
+	#editor-properties
+	{
+		position: absolute;
+		top: 20%;
+		right: 30%;
+		width: 40%;
+		min-width: 200px;
+		padding: 8px 12px 12px 8px;
+		border-radius: 5px 12px;
+	}
+	#editor-guardtypes
+	{
+		margin: 10px;
+	}
+	.button-hover:hover
+	{
+		background: #333333;
+	}
+	.editor-quantity
+	{
+		margin: 5px;
+		margin-right: 10px;
+		width: 100px;
 	}
 	</style>
 </head>
 <body style="margin: 0; padding: 0; overflow: hidden; color: #ffffff; background: #1b1b1b;">
 
+<p id="editor-title" style="display: none;"></p>
+<div id="editor-menu" class="verticalMenu" style="display: none;">
+	<button id="editor-quit" style="margin-bottom: 50px;">QUIT</button>
+	<button id="editor-new">New Level</button>
+	<button id="editor-undo">Undo</button>
+	<button id="editor-random">Random</button>
+	<button id="editor-normalize">Normalize</button>
+	<div style="margin-top: 20px;" id="editor-pickerwrapper">
+		<p style="margin: 0px; margin-bottom: 7px;">Import SVG:</p>
+		<input type="file" accept=".svg" id="editor-filepicker"></input>
+	</div>
+	<button id="editor-finish" style="margin-top: 50px;">Finish</button>
+</div>
+
+<div class="transparent" id="editor-properties" style="display: none;">
+	<p>Name:</p>
+	<input type="text" class="fullwidth" id="editor-name"></input>
+	<p>Description:</p>
+	<textarea rows="4" class="fullwidth" id="editor-description"></textarea>
+	<p>Budget:</p>
+	<input type="number" class="fullwidth" id="editor-budget"></input>
+	<p>Available guards:</p>
+	<div id="editor-guardtypes"></div>
+	<button class="fullwidth centered button-hover" id="editor-accept">Accept</button>
+	<div class="fullwidth centered"  id="editor-exportwrapper" style="display: none">
+		<p>Right-click and "Save link as..." to save the level: <a id="editor-exportlink">[link]</a></p>
+		<button class="fullwidth centered button-hover" id="editor-reset">Reset Settings</button>
+	</div>
+</div>
+
+<script src="three.min.js"></script>
+
+<script src="util.js"></script>
+<script src="intersection.js"></script>
+<script src="bbst.js"></script>
+<script src="dcel.js"></script>
+<script src="visibility.js"></script>
+<script src="ui.js"></script>
+
+<script src="guards.js"></script>
 <script src="levels.js"></script>
 <script src="levels/level1.js"></script>
 <script src="levels/level2.js"></script>
@@ -83,18 +220,10 @@
 <script src="levels/level15.js"></script>
 <script src="levels/level16.js"></script>
 
-<script src="three.min.js"></script>
-
-<script src="util.js"></script>
-<script src="intersection.js"></script>
-<script src="bbst.js"></script>
-<script src="dcel.js"></script>
-<script src="visibility.js"></script>
-<script src="ui.js"></script>
-
-<script src="galleryui.js"></script>
-<script src="gamestate.js"></script>
 <script src="graphics.js"></script>
+<script src="galleryui.js"></script>
+<script src="editor.js"></script>
+<script src="gamestate.js"></script>
 <script src="gallery.js"></script>
 
 </body>

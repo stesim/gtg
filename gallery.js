@@ -1,14 +1,11 @@
 var WALLHEIGHT = 100;
 var WALLWIDTH = 10;
 var PILLARHEIGHT = 103;
-var PICTUREOFFSETMIN = 30;
-var PICTUREOFFSETMAX = 150;
 
 var ZAXIS = new THREE.Vector3( 0, 0, 1 );
 
-var stats, svgContainer;
+var stats;
 var time;
-var probeMesh;
 var dragging =
 {
 	active: false,
@@ -18,13 +15,17 @@ var dragging =
 };
 var keymap = {};
 
-var currentLevel = 0;
-var cameraIndex = 0;
+var currentLevel = null;
+
 var polygon = new Array();
 var dcel = null;
 
 var guards = new Array();
-var pictures = new Array();
+var pictureVisibility = null;
+
+var selectedGuardType = null;
+var currentBudget = 0;
+var availableGuards = new Array( GuardTypes.length );
 
 var isInFirstPerson = false;
 var firstPersonGuard = null;
@@ -33,24 +34,6 @@ var lastOverviewCamRotation = 0.0;
 var lastOverviewCamPosition = new THREE.Vector3( 0, 0, 700 );
 var moveOverviewByDrag = true;
 var pickedGuard = null;
-
-function Guard()
-{
-	this.position = null;
-	this.polygon = null;
-	this.cameraMesh = null;
-	this.visibilityMesh = null;
-	this.color = null;
-}
-
-function Picture( id, start, end, mesh )
-{
-	this.id = id;
-	this.start = start;
-	this.end = end;
-	this.visibleFrom = null;
-	this.mesh = mesh;
-}
 
 init();
 
@@ -64,24 +47,12 @@ function init()
 //	stats.domElement.style.bottom = '10px';
 //	document.body.appendChild( stats.domElement );
 
-	svgContainer = document.createElement( "div" );
-	svgContainer.id = "svg-container";
-
 	time = new THREE.Clock( true );
 
 	graphics.init( update );
 
-	probeMesh = new THREE.Mesh(
-		new THREE.SphereGeometry( 10, 16, 16 ),
-		new THREE.MeshBasicMaterial( { color: 0xff0000 } ) );
-	probeMesh.visible = false;
-
-	//graphics.scene.add( probeMesh );
-
 	graphics.renderer.domElement.
 		addEventListener( "mousedown", onMouseDown, false );
-	graphics.renderer.domElement.
-		addEventListener( "mouseup", onMouseUp, false );
 	graphics.renderer.domElement.
 		addEventListener( "mousewheel", onMouseScroll, false );
 
@@ -89,6 +60,8 @@ function init()
 	document.addEventListener( "keyup", onKeyUp, false );
 
 	ui.init();
+
+	LevelEditor.init();
 
 	GameState.set( GameStates.Menu );
 
@@ -192,54 +165,104 @@ function update()
 	}
 }
 
-function resetFxCamera()
-{
-	graphics.fxView.camera.up.set( 0, 1, 0 );
-	graphics.fxView.camera.position.copy( lastOverviewCamPosition );
-	graphics.fxView.camera.rotation.set( 0, 0, 0 );
-	//graphics.fxView.camera.lookAt( graphics.scene.position );
-}
-
 function restart()
 {
 	polygon.length = 0;
 	graphics.clearLevelMeshes();
 
-	resetFxCamera();
+	graphics.resetFxCamera();
 	lastFxCamRotation = 0;
 	lastOverviewCamRotation = 0;
-	lastOverviewCamPosition.set( 0, 0, 700 );
+	lastOverviewCamPosition.copy( graphics.fxView.camera.position );
 
 	ui.hint.cancel();
-
-	probeMesh.visible = false;
-
-	//console.clear();
 }
 
-function finishLevelEditing()
+function getGuardTypeButton( type )
 {
-	GameStates.LevelEditing.finished = true;
-
-	ui.levelCreationMenu.finishButton.hide();
-	ui.levelCreationMenu.undoButton.hide();
-
-	var link = createExportLink();
-	ui.levelCreationMenu.exportLink.url( link ).show();
-}
-
-function onSvgSelected( event )
-{
-	var input = event.target;
-
-	var reader = new FileReader();
-	reader.onload = function()
+	for( var i = 0; i < currentLevel.guardTypes.length; ++i )
 	{
-		importLevel( importSvg, reader.result );
-	};
-	reader.readAsText( input.files[ 0 ] );
+		if( GuardTypes[ currentLevel.guardTypes[ i ].type ] == type )
+		{
+			return ui.guardDetails.buttons.controls[ i ];
+		}
+	}
+}
 
-	finishLevelEditing();
+function selectGuardType( type )
+{
+	if( selectedGuardType !== null )
+	{
+		getGuardTypeButton( selectedGuardType ).cssClass( "" );
+	}
+	selectedGuardType = type;
+	if( selectedGuardType !== null )
+	{
+		getGuardTypeButton( selectedGuardType ).cssClass( "selected" );
+	}
+}
+
+function addGuardButtons()
+{
+	for( var i = 0; i < currentLevel.guardTypes.length; ++i )
+	{
+		var type = GuardTypes[ currentLevel.guardTypes[ i ].type ];
+		var button = new UI.Button( "" )
+			.position( { top: i * 40, right: 0 } ).show();
+		button.onclick( selectGuardType.bind( button, type ) );
+		ui.guardDetails.buttons.add( button );
+	}
+	updateGuardDetails();
+}
+
+function removeGuardButtons()
+{
+	while( ui.guardDetails.buttons.controls.length > 0 )
+	{
+		ui.guardDetails.buttons.remove(	ui.guardDetails.buttons.controls[ 0 ] );
+	}
+}
+
+function loadLevelGeometry()
+{
+	polygon = new Array( currentLevel.geometry.length );
+	for( var i = 0; i < currentLevel.geometry.length; ++i )
+	{
+		polygon[ i ] = new THREE.Vector2(
+			currentLevel.geometry[ i ][ 0 ], currentLevel.geometry[ i ][ 1 ] );
+	}
+
+	for( var i = 1; i < polygon.length; ++i )
+	{
+		graphics.levelMeshes.add( graphics.createWallMesh(
+			polygon[ i - 1 ], polygon[ i ] ) );
+	}
+
+	graphics.levelMeshes.add( graphics.createWallMesh(
+		polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
+
+	dcel = new DCEL().fromVectorList( polygon );
+
+	var floorMesh = graphics.createPolygonMesh(
+		dcel, graphics.floorMaterial );
+	graphics.levelMeshes.add( floorMesh );
+}
+
+function placePictures()
+{
+	for( var i = 0; i < currentLevel.pictures.length; ++i )
+	{
+		var picture = currentLevel.pictures[ i ];
+
+		var edge = dcel.edges[ picture.edge ];
+		var pos = edge.lerp( 0.5 * ( picture.start + picture.end ) );
+
+		var size = ( picture.end - picture.start ) * edge.length();
+
+		var mesh = graphics.createPictureMesh(
+			picture.id, pos, edge.normal(), size );
+		graphics.levelMeshes.add( mesh );
+	}
 }
 
 function loadLevel( level )
@@ -256,236 +279,103 @@ function loadLevel( level )
 
 	GameState.set( GameStates.LevelLoading );
 
+	selectedGuardType = null;
+	pickedGuard = null;
+
 	guards.length = 0;
-	pictures.length = 0;
-	cameraIndex = 0;
 
-	importLevel( toVectorArray, levels[ level ] );
-
-	currentLevel = level;
-
-	GameState.set( GameStates.GuardPlacement );
-
-	// TODO: implement hints in level description
-	var hint = null;
-	switch( level )
-	{
-		case 0:
-			hint = "Place guards to guard the art by clicking inside the gallery.";
-			break;
-		case 2:
-			hint = "If you cannot see some of the art, try moving the camera by holding the left mouse button and moving the mouse.";
-			break;
-		case 4:
-			hint = "Sometimes one guard may not be enough to cover all the valuable art.";
-			break;
-		case 6:
-			hint = "A guard you placed turned out to be less useful than expected? If the cursor is on a guard when pressing the mouse button, that guard will be moved instead of the camera. Moving guards to the outside of the gallery removes them.";
-			break;
-	}
-	if( hint !== null )
-	{
-		ui.hint.display( hint, 10 );
-	}
-}
-
-function importLevel( parser, data )
-{
 	restart();
 
-	var points = parser( data );
+	currentLevel = levels[ level ];
 
-	if( points != null )
+	loadLevelGeometry();
+	placePictures();
+
+	pictureVisibility = new Array( currentLevel.pictures.length );
+	for( var i = 0; i < pictureVisibility.length; ++i )
 	{
-		polygon = points;
-
-		normalizePolygon( Math.min( graphics.WIDTH, graphics.HEIGHT ) );
-		createPolygonMeshes();
-
-		processLevel();
+		pictureVisibility[ i ] = null;
 	}
-	else
+
+	for( var i = 0; i < availableGuards.length; ++i )
 	{
-		alert( "Importing level geometry failed!" );
+		availableGuards[ i ] = 0;
 	}
+	for( var i = 0; i < currentLevel.guardTypes.length; ++i )
+	{
+		availableGuards[ currentLevel.guardTypes[ i ].type ] =
+			currentLevel.guardTypes[ i ].quantity;
+	}
+
+	currentBudget = currentLevel.budget;
+
+	ui.levelDetails.title.text( currentLevel.name );
+	ui.levelDetails.description.text( currentLevel.description );
+
+	GameState.set( GameStates.GuardPlacement );
 }
 
-function importSvg( svg )
+function updateGuardDetails()
 {
-	svgContainer.innerHTML = svg;
+	ui.guardDetails.budget.text( currentBudget + "$" );
 
-	// TODO: find right path if more than one are present
-	var pathElems = svgContainer.getElementsByTagName( "path" );
-	if( pathElems.length <= 0 )
+	for( var i = 0; i < currentLevel.guardTypes.length; ++i )
 	{
-		return null;
-	}
-	var segments = pathElems[ 0 ].pathSegList;
-	var length = pathElems[ 0 ].pathSegList.numberOfItems;
-	if( length <= 0 )
-	{
-		return null;
-	}
+		var index = currentLevel.guardTypes[ i ].type;
+		var type = GuardTypes[ index ];
+		var button = ui.guardDetails.buttons.controls[ i ];
+		var available = availableGuards[ index ];
 
-	var points = new Array();
-	var seg = segments.getItem( 0 );
-	if( seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_ABS ||
-	    seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_REL )
-	{
-		points.push( new THREE.Vector2( seg.x, -seg.y ) );
-	}
-	else
-	{
-		return null;
-	}
+		button.text( type.cost + "$ - " + type.name + " (" + available + ")" );
 
-	for( var i = 1; i < length; ++i )
-	{
-		var seg = segments.getItem( i );
-		switch( seg.pathSegType )
+		if( ( type.cost > currentBudget || available <= 0 ) &&
+			!button.elem.disabled )
 		{
-			case SVGPathSeg.PATHSEG_LINETO_ABS:
-			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_ABS:
-				points.push( new THREE.Vector2( seg.x, -seg.y ) );
-				break;
-			case SVGPathSeg.PATHSEG_LINETO_REL:
-			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_REL:
-				points.push(
-					new THREE.Vector2( seg.x, -seg.y )
-					.add( points[ points.length - 1 ] ) );
-				break;
-			case SVGPathSeg.PATHSEG_CLOSEPATH:
-				if( i < length - 1 )
-				{
-					return null;
-				}
-				break;
-			default:
-				return null;
+			button.disable();
+		}
+		else if( ( type.cost <= currentBudget && available > 0 ) &&
+			button.elem.disabled )
+		{
+			button.enable();
 		}
 	}
-
-	return points;
 }
 
-function normalizePolygon( size )
+function addGuard( p )
 {
-	if( polygon.length <= 0 )
+	if( selectedGuardType === null ) { return; }
+
+	if( availableGuards[ GuardTypes.indexOf( selectedGuardType ) ] <= 0 )
 	{
-		return;
+		ui.hint.display( "You do not have any more guards of this type available.", 2 );
 	}
-
-	var xmin = polygon[ 0 ].x;
-	var xmax = xmin;
-	var ymin = polygon[ 0 ].y;
-	var ymax = ymin;
-	for( var i = 1; i < polygon.length; ++i )
+	else if( currentBudget < selectedGuardType.cost )
 	{
-		var p = polygon[ i ];
-		if( p.x < xmin )      { xmin = p.x; }
-		else if( p.x > xmax ) { xmax = p.x; }
-
-		if( p.y < ymin )      { ymin = p.y; }
-		else if( p.y > ymax ) { ymax = p.y; }
-	}
-
-	var scale = Math.min( size / ( xmax - xmin ), size / ( ymax - ymin ) );
-	var center =
-		new THREE.Vector2( 0.5 * ( xmax + xmin ), 0.5 * ( ymax + ymin ) );
-
-	for( var i = 0; i < polygon.length; ++i )
-	{
-		polygon[ i ].sub( center ).multiplyScalar( scale );
-	}
-}
-
-function createPolygonMeshes()
-{
-	if( polygon.length <= 0 ) { return; }
-
-	for( var i = 1; i < polygon.length; ++i )
-	{
-		graphics.levelMeshes.add( createWall( polygon[ i - 1 ], polygon[ i ] ) );
-	}
-
-	if( polygon.length > 2 )
-	{
-		graphics.levelMeshes.add(
-			createWall( polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
-	}
-}
-
-function createExportLink()
-{
-	if( polygon.length <= 0 ) { return null; }
-
-	var txt = "levels.push( [\n";
-	for( var i = 0; i < polygon.length; ++i )
-	{
-		txt += "[ " + polygon[ i ].x + ", " + polygon[ i ].y;
-		txt += ( i < polygon.length - 1 ? " ],\n" : " ]\n" );
-	}
-	txt += "] );\n";
-
-	var blob = new Blob( [ txt ], { type: "application/javascript" } );
-	return URL.createObjectURL( blob );
-}
-
-function createWall( start, end )
-{
-	var diff = end.clone().sub( start );
-	var center = new THREE.Vector3().lerpVectors( start, end, 0.5 );
-	var length = diff.length();
-
-	var wall = new THREE.Mesh(
-		new THREE.PlaneGeometry( length, WALLHEIGHT ),
-		graphics.wallMaterial );
-	wall.rotation.order = "ZXY";
-	wall.rotation.set( Math.PI / 2, 0, Math.atan2( diff.y, diff.x ) );
-	wall.position.set( center.x, center.y, WALLHEIGHT / 2 );
-
-	return wall;
-}
-
-function createPillar( pos )
-{
-	var pillar = new THREE.Mesh(
-		new THREE.CylinderGeometry( WALLWIDTH / 2, WALLWIDTH / 2, PILLARHEIGHT, 16, 1 ),
-		graphics.wallMaterial );
-	pillar.rotation.set( Math.PI / 2, 0, 0 );
-	pillar.position.set( pos.x, pos.y, PILLARHEIGHT / 2 );
-
-	return pillar;
-}
-
-function addOrMoveGuard( guard, p )
-{
-	if( guard === null )
-	{
-		guard = new Guard();
-		guards.push( guard );
-
-		guard.color = Math.floor( 0xffffff * Math.random() );
-		guard.guardMesh = createCameraMesh( p, guard.color );
-
-		graphics.levelMeshes.add( guard.guardMesh );
+		ui.hint.display( "You cannot afford this guard.", 2 );
 	}
 	else
 	{
-		removePictureVisibilityFrom( guard );
+		var guard = selectedGuardType.create( p, dcel );
 
-		graphics.levelMeshes.remove( guard.visibilityMesh );
+		graphics.levelMeshes.add( guard.guardMesh );
+		graphics.levelMeshes.add( guard.visibilityMesh );
 
-		guard.guardMesh.position.set( p.x, p.y, 0 );
+		guards.push( guard );
+
+		currentBudget -= guard.type.cost;
+		--availableGuards[ GuardTypes.indexOf( guard.type ) ];
+		updateGuardDetails();
+
+		addPictureVisibilityFrom( guard );
 	}
+}
 
-	guard.position = p;
-	guard.polygon = visibility( dcel, p );
+function moveGuard( guard, p )
+{
+	removePictureVisibilityFrom( guard );
 
-	guard.visibilityMesh = createPolygonMesh(
-		guard.polygon, graphics.visibilityMaterial, guard.color );
-	guard.visibilityMesh.position.set( 0, 0, ( ++cameraIndex ) * 0.02 );
-
+	graphics.levelMeshes.remove( guard.visibilityMesh );
+	guard.move( p, dcel );
 	graphics.levelMeshes.add( guard.visibilityMesh );
 
 	addPictureVisibilityFrom( guard );
@@ -499,6 +389,10 @@ function removeGuard( guard )
 	graphics.levelMeshes.remove( guard.visibilityMesh );
 
 	guards.splice( guards.indexOf( guard ), 1 );
+
+	currentBudget += guard.type.cost;
+	++availableGuards[ GuardTypes.indexOf( guard.type ) ];
+	updateGuardDetails();
 }
 
 function findGuardNear( p )
@@ -515,9 +409,12 @@ function findGuardNear( p )
 
 function onMouseDown( event )
 {
+	event.preventDefault();
+
 	if( GameState.get() === GameStates.GuardPlacement )
 	{
-		event.preventDefault();
+		document.addEventListener( "mouseup", onMouseUp, false );
+
 		var coord = new THREE.Vector2( event.clientX,
 									   graphics.HEIGHT - event.clientY );
 
@@ -536,6 +433,8 @@ function onMouseDown( event )
 function onMouseUp( event )
 {
 	event.preventDefault();
+	document.removeEventListener( "mouseup", onMouseUp, false );
+
 	var coord = new THREE.Vector2( event.clientX,
 	                               graphics.HEIGHT - event.clientY );
 
@@ -561,25 +460,7 @@ function onMouseUp( event )
 		stopDragging();
 	}
 
-	if( GameState.get() === GameStates.LevelEditing &&
-		!GameStates.LevelEditing.finished )
-	{
-		var p = graphics.screenToWorldPosition( coord );
-		if( p === null ) { return; }
-
-		polygon.push( p );
-
-		if( polygon.length > 1 )
-		{
-			graphics.levelMeshes.add(
-				createWall( polygon[ polygon.length - 2 ], p ) );
-		}
-		else
-		{
-			graphics.levelMeshes.add( createPillar( p ) );
-		}
-	}
-	else if( GameState.get() === GameStates.GuardPlacement )
+	if( GameState.get() === GameStates.GuardPlacement )
 	{
 		if( !isInFirstPerson )
 		{
@@ -590,7 +471,8 @@ function onMouseUp( event )
 
 				if( dcel.faces[ 0 ].contains( p ) )
 				{
-					addOrMoveGuard( null, p );
+					//addOrMoveGuard( null, p );
+					addGuard( p );
 
 					checkCompletion();
 				}
@@ -606,7 +488,8 @@ function onMouseUp( event )
 
 				if( dcel.faces[ 0 ].contains( p ) )
 				{
-					addOrMoveGuard( pickedGuard, p );
+					//addOrMoveGuard( pickedGuard, p );
+					moveGuard( pickedGuard, p );
 					checkCompletion();
 				}
 				else
@@ -659,7 +542,14 @@ function onMouseDrag( event )
 				ZAXIS, lastOverviewCamRotation - diff.x / 250.0 );
 			graphics.fxView.camera.lookAt( graphics.scene.position );
 		}
-
+	}
+	else
+	{
+		var p = graphics.screenToWorldPosition( coord );
+		if( p !== null )
+		{
+			pickedGuard.guardMesh.position.set( p.x, p.y, 0 );
+		}
 	}
 }
 
@@ -693,6 +583,10 @@ function switchToFirstPerson( guard )
 	guard.guardMesh.position.set( 0, 0, 0 );
 	graphics.fxView.camera.add( guard.guardMesh );
 
+	graphics.lookDirArrow.visible = true;
+
+	graphics.levelMeshes.remove( guard.visibilityMesh );
+
 	ui.ingameMenu.overviewButton.show();
 }
 
@@ -702,14 +596,17 @@ function switchToOverview()
 
 	var guard = firstPersonGuard;
 
+	graphics.lookDirArrow.visible = true;
+
 	graphics.fxView.camera.remove( guard.guardMesh );
-	addOrMoveGuard( firstPersonGuard,
+	moveGuard( firstPersonGuard,
 		new THREE.Vector2(
 			graphics.fxView.camera.position.x,
 			graphics.fxView.camera.position.y ) );
 	graphics.levelMeshes.add( guard.guardMesh );
 
-	resetFxCamera();
+	graphics.resetFxCamera();
+	graphics.fxView.camera.position.copy( lastOverviewCamPosition );
 
 	isInFirstPerson = false;
 	firstPersonGuard = null;
@@ -719,9 +616,7 @@ function switchToOverview()
 
 function startDragging( coord )
 {
-	//graphics.renderer.domElement.setCapture();
-	graphics.renderer.domElement.
-		addEventListener( "mousemove", onMouseDrag, false );
+	document.addEventListener( "mousemove", onMouseDrag, false );
 
 	dragging.active = true;
 	dragging.effective = false;
@@ -732,8 +627,7 @@ function startDragging( coord )
 
 function stopDragging()
 {
-	graphics.renderer.domElement.
-		removeEventListener( "mousemove", onMouseDrag, false );
+	document.removeEventListener( "mousemove", onMouseDrag, false );
 	dragging.active = false;
 }
 
@@ -746,30 +640,35 @@ function isPictureOnEdge( picture, edge )
 		var line = b.clone().sub( a );
 		var proj = line.dot( p.clone().sub( a ) ) / line.lengthSq();
 
-		return ( proj >= 0.0 - eps && proj <= 1.0 + eps );
+		return ( proj > -eps && proj < 1.0 + eps );
 	}
 
-	var intersection = extendedLineIntersection(
-		picture.start, picture.end, edge.origin.pos, edge.next.origin.pos );
+	var start = dcel.edges[ picture.edge ].lerp( picture.start );
+	var end = dcel.edges[ picture.edge ].lerp( picture.end );
 
-	return ( intersection === null && Math.abs( edge.pointDistance( picture.start ) ) < eps &&
-		( isPointOnSegment( picture.start, edge.origin.pos, edge.next.origin.pos ) ||
-		  isPointOnSegment( picture.end,   edge.origin.pos, edge.next.origin.pos ) ||
-		  isPointOnSegment( edge.origin.pos,      picture.start, picture.end ) ||
-		  isPointOnSegment( edge.next.origin.pos, picture.start, picture.end ) ) );
+	var intersection = extendedLineIntersection(
+		start, end, edge.origin.pos, edge.next.origin.pos );
+
+	return ( intersection === null &&
+		Math.abs( edge.pointDistance( start ) ) < eps &&
+		( isPointOnSegment( start, edge.origin.pos, edge.next.origin.pos ) ||
+		  isPointOnSegment( end,   edge.origin.pos, edge.next.origin.pos ) ||
+		  isPointOnSegment( edge.origin.pos,      start, end ) ||
+		  isPointOnSegment( edge.next.origin.pos, start, end ) ) );
 }
 
 function addPictureVisibilityFrom( guard )
 {
-	for( var i = 0; i < pictures.length; ++i )
+	for( var i = 0; i < currentLevel.pictures.length; ++i )
 	{
-		if( pictures[ i ].visibleFrom !== null ) { continue; }
+		if( pictureVisibility[ i ] !== null ) { continue; }
 
 		for( var j = 0; j < guard.polygon.edges.length; ++j )
 		{
-			if( isPictureOnEdge( pictures[ i ], guard.polygon.edges[ j ] ) )
+			if( isPictureOnEdge( currentLevel.pictures[ i ],
+			                     guard.polygon.edges[ j ] ) )
 			{
-				pictures[ i ].visibleFrom = guard;
+				pictureVisibility[ i ] = guard;
 				break;
 			}
 		}
@@ -778,11 +677,11 @@ function addPictureVisibilityFrom( guard )
 
 function removePictureVisibilityFrom( guard )
 {
-	for( var i = 0; i < pictures.length; ++i )
+	for( var i = 0; i < currentLevel.pictures.length; ++i )
 	{
-		if( pictures[ i ].visibleFrom === guard )
+		if( pictureVisibility[ i ] === guard )
 		{
-			pictures[ i ].visibleFrom = null;
+			pictureVisibility[ i ] = null;
 		}
 	}
 }
@@ -790,9 +689,9 @@ function removePictureVisibilityFrom( guard )
 function checkCompletion()
 {
 	var completed = true;
-	for( var i = 0; i < pictures.length; ++i )
+	for( var i = 0; i < pictureVisibility.length; ++i )
 	{
-		if( pictures[ i ].visibleFrom === null )
+		if( pictureVisibility[ i ] === null )
 		{
 			completed = false;
 			break;
@@ -803,244 +702,4 @@ function checkCompletion()
 	{
 		GameState.set( GameStates.LevelCompleted );
 	}
-}
-
-function undoGuard()
-{
-	if( guards.length > 0 )
-	{
-		removeGuard( guards[ guards.length - 1 ] );
-	}
-}
-
-function areaOfUnion( polygons )
-{
-	function areaOfUnionRec( polygons, indices, depth, maxDepth )
-	{
-		if( depth === maxDepth )
-		{
-			var tmp = "";
-			var polys = new Array( maxDepth );
-			for( var i = 0; i < polys.length; ++i )
-			{
-				polys[ i ] = polygons[ indices[ i ] ];
-				tmp += indices[ i ] + ", ";
-			}
-			var ret = areaOfIntersection( polys );
-			console.log( tmp + "-> " + ret );
-			return ret;
-		}
-		else
-		{
-			var start = ( depth > 0 ? indices[ depth - 1 ] + 1 : 0 );
-			var sum = 0;
-			for( var i = start; i < polygons.length; ++i )
-			{
-				indices[ depth ] = i;
-				sum += areaOfUnionRec( polygons, indices, depth + 1, maxDepth );
-			}
-			return sum;
-		}
-	}
-
-	var indices = new Array( polygons.length );
-	var sum = 0;
-	for( var i = 1; i <= polygons.length; ++i )
-	{
-		if( i % 2 !== 0 )
-		{
-			console.log( "+" );
-			sum += areaOfUnionRec( polygons, indices, 0, i );
-		}
-		else
-		{
-			console.log( "-" );
-			sum -= areaOfUnionRec( polygons, indices, 0, i );
-		}
-	}
-
-	return sum;
-}
-
-function areaOfIntersection( polygons )
-{
-	var intermediate = polygons[ 0 ];
-	for( var i = 1; i < polygons.length; ++i )
-	{
-		intermediate =
-			intersectSimplePolygonsDCEL( intermediate, polygons[ i ] );
-		if( intermediate === null )
-		{
-			return 0;
-		}
-	}
-	return intermediate.faces[ 0 ].area();
-}
-
-function createCameraMesh( pos, _color )
-{
-	var mesh = new THREE.Mesh(
-		new THREE.SphereGeometry( 12, 16, 16 ),
-		new THREE.MeshBasicMaterial( { color: _color } ) );
-	mesh.position.set( pos.x, pos.y, 0 );
-
-	return mesh;
-}
-
-function undoWall()
-{
-	if( GameState.get() !== GameStates.LevelEditing )
-	{
-		return;
-	}
-
-	if( polygon.length > 1 )
-	{
-		polygon.length -= 1;
-		graphics.levelMeshes.remove(
-			graphics.levelMeshes.children[ graphics.levelMeshes.children.length - 1 ] );
-		graphics.levelMeshes.remove(
-			graphics.levelMeshes.children[ graphics.levelMeshes.children.length - 1 ] );
-	}
-	else if( polygon.length == 1 )
-	{
-		polygon.length -= 1;
-		graphics.levelMeshes.remove(
-			graphics.levelMeshes.children[ graphics.levelMeshes.children.length - 1 ] );
-	}
-}
-
-function processLevel()
-{
-	graphics.levelMeshes.add(
-		createWall( polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
-
-	dcel = new DCEL().fromVectorList( polygon );
-
-	placePictures();
-
-	var floorMesh = createPolygonMesh( dcel, graphics.floorMaterial );
-	graphics.levelMeshes.add( floorMesh );
-}
-
-function visualizeDCEL( face, color, obj )
-{
-	function visualizeEdge( e )
-	{
-		var orig2 =
-			e.normal().multiplyScalar( 3 ).add( e.origin.pos );
-		var dir2 = e.vector();
-		var len = dir2.length();
-		dir2.divideScalar( len );
-
-		var headLen = Math.min( len / 4, 75 );
-
-		var arrow = new THREE.ArrowHelper(
-			new THREE.Vector3( dir2.x, dir2.y, 0 ),
-			new THREE.Vector3( orig2.x, orig2.y, 120 ),
-			len,
-			color,
-			headLen,
-			headLen / 3 );
-		obj.add( arrow );
-	}
-
-	face.temp = true;
-
-	var iter = face.edge;
-	do
-	{
-		if( iter.twin !== null && iter.twin.face.temp === null )
-		{
-			visualizeDCEL( iter.twin.face, color, obj );
-		}
-
-		visualizeEdge( iter );
-
-		iter = iter.next;
-	} while( iter !== face.edge );
-}
-
-function addDCELFaceMesh( face )
-{
-	var color = new THREE.Color( Math.floor( 0xffffff * Math.random() ) );
-
-	var obj = new THREE.Object3D();
-	visualizeDCEL( face, color, obj );
-	graphics.levelMeshes.add( obj );
-}
-
-function placePictures()
-{
-	function randOffset()
-	{
-		var r = Math.random();
-		return ( r * PICTUREOFFSETMIN + ( 1 - r ) * PICTUREOFFSETMAX ); 
-	}
-
-	var id = Math.floor( Math.random() * graphics.pictureMaterials.length );
-
-	var material = graphics.pictureMaterials[ id ];
-
-	var iter = dcel.edges[ 0 ];
-	do
-	{
-		var wallLength = iter.length();
-		var pos = randOffset();
-		var size = Math.min( ( Math.random() * 0.2 + 0.6 ) * WALLHEIGHT, 50 );
-
-		while( wallLength >= pos + size + PICTUREOFFSETMIN )
-		{
-			pos += 0.5 * size;
-
-			var height = 0.5 * WALLHEIGHT;
-			var normal = iter.normal().multiplyScalar( 0.5 );
-			var dir = iter.direction();
-			var vecPos = iter.lerp( pos / wallLength ).add( normal );
-
-			var picture = new THREE.Mesh(
-				new THREE.PlaneGeometry( size, size ),
-				material );
-
-			picture.position.set( vecPos.x, vecPos.y, height );
-			picture.lookAt( new THREE.Vector3( normal.x, normal.y, 0 )
-			                .add( picture.position ) );
-
-			graphics.levelMeshes.add( picture );
-
-			pictures.push( new Picture(
-				id,
-				iter.lerp( ( pos - 0.5 * size ) / wallLength ),
-				iter.lerp( ( pos + 0.5 * size ) / wallLength ),
-				picture ) );
-
-			pos += 0.5 * size + randOffset();
-			size = Math.min( ( Math.random() * 0.5 + 0.3 ) * WALLHEIGHT, 50 );
-		}
-
-		iter = iter.next;
-	} while( iter != dcel.edges[ 0 ] );
-}
-
-function createPolygonMesh( dcel, material, color )
-{
-	var shape = new THREE.Shape();
-	shape.moveTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
-
-	var iter = dcel.edges[ 0 ].next;
-	while( iter !== dcel.edges[ 0 ] )
-	{
-		shape.lineTo( iter.origin.pos.x, iter.origin.pos.y );
-
-		iter = iter.next;
-	}
-	shape.lineTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
-
-	var geom = shape.makeGeometry();
-	for( var i = 0; i < geom.faces.length; ++i )
-	{
-		geom.faces[ i ].color.setHex( color );
-	}
-
-	return new THREE.Mesh( geom, material );
 }

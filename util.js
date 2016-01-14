@@ -87,3 +87,26 @@ function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
 	return ( closestIntersection !== null ?
 		{ edge: intersectedEdge, intersection: closestIntersection } : null );
 }
+
+function findClosestDCELEdge( dcel, p )
+{
+	var closestEdge = null;
+	var closestProjection = null;
+
+	for( var i = 0; i < dcel.edges.length; ++i )
+	{
+		var edge = dcel.edges[ i ];
+		var projection = edge.pointProjection( p );
+		if( closestEdge === null ||
+			projection.distance < closestProjection.distance )
+		{
+			closestEdge = edge;
+			closestProjection = projection;
+		}
+	}
+
+	return {
+		edge: closestEdge,
+		localCoordinate: closestProjection.localCoordinate,
+		distance: closestProjection.distance };
+}

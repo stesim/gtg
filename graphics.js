@@ -80,7 +80,7 @@ var graphics =
 			1.0 / graphics.topView.viewport.width,
 			1.0 / graphics.topView.viewport.height ) + 1;
 
-		//graphics.resetFxCamera();
+		graphics.resetFxCamera();
 		graphics.fxView.update();
 		graphics.scene.add( graphics.fxView.camera );
 
@@ -140,7 +140,8 @@ var graphics =
 			0xffffff,
 			30,
 			20 );
-		//graphics.fxView.camera.add( graphics.lookDirArrow );
+		graphics.lookDirArrow.visible = false;
+		graphics.fxView.camera.add( graphics.lookDirArrow );
 	},
 
 	enableRendering: function()
@@ -153,6 +154,13 @@ var graphics =
 	{
 		graphics.renderer.domElement.style.visibility = "hidden";
 		graphics.renderingEnabled = false;
+	},
+
+	resetFxCamera: function()
+	{
+		graphics.fxView.camera.up.set( 0, 1, 0 );
+		graphics.fxView.camera.position.set( 0, 0, 700 );
+		graphics.fxView.camera.rotation.set( 0, 0, 0 );
 	},
 
 	render: function()
@@ -255,5 +263,84 @@ var graphics =
 		graphics.scene.remove( graphics.levelMeshes );
 		graphics.levelMeshes = new THREE.Object3D();
 		graphics.scene.add( graphics.levelMeshes );
+	},
+
+	createWallMesh: function( start, end )
+	{
+		var diff = end.clone().sub( start );
+		var center = new THREE.Vector3().lerpVectors( start, end, 0.5 );
+		var length = diff.length();
+
+		var wall = new THREE.Mesh(
+			new THREE.PlaneGeometry( length, WALLHEIGHT ),
+			graphics.wallMaterial );
+		wall.rotation.order = "ZXY";
+		wall.rotation.set( Math.PI / 2, 0, Math.atan2( diff.y, diff.x ) );
+		wall.position.set( center.x, center.y, WALLHEIGHT / 2 );
+
+		return wall;
+	},
+
+	createPillarMesh: function( pos )
+	{
+		var pillar = new THREE.Mesh(
+			new THREE.CylinderGeometry(
+				WALLWIDTH / 2,
+				WALLWIDTH / 2,
+				PILLARHEIGHT,
+				16,
+				1 ),
+			graphics.wallMaterial );
+		pillar.rotation.set( Math.PI / 2, 0, 0 );
+		pillar.position.set( pos.x, pos.y, PILLARHEIGHT / 2 );
+
+		return pillar;
+	},
+
+	createPictureMesh: function( id, pos, dir, size )
+	{
+		var material = graphics.pictureMaterials[ id ];
+
+		var mesh = new THREE.Mesh(
+			new THREE.PlaneGeometry( size, size ),
+			material );
+
+		mesh.position.set(
+			pos.x + 0.5 * dir.x,
+			pos.y + 0.5 * dir.y,
+			0.5 * WALLHEIGHT );
+		mesh.lookAt( new THREE.Vector3(
+			mesh.position.x + dir.x,
+			mesh.position.y + dir.y,
+			mesh.position.z ) );
+
+		return mesh;
+	},
+
+	createPolygonMesh: function( dcel, material, color )
+	{
+		var shape = new THREE.Shape();
+		shape.moveTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
+
+		var iter = dcel.edges[ 0 ].next;
+		while( iter !== dcel.edges[ 0 ] )
+		{
+			shape.lineTo( iter.origin.pos.x, iter.origin.pos.y );
+
+			iter = iter.next;
+		}
+		shape.lineTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
+
+		var geom = shape.makeGeometry();
+
+		if( color )
+		{
+			for( var i = 0; i < geom.faces.length; ++i )
+			{
+				geom.faces[ i ].color.setHex( color );
+			}
+		}
+
+		return new THREE.Mesh( geom, material );
 	},
 }

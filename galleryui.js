@@ -86,47 +86,6 @@ var ui =
 				GameStates.Menu.lastVisible = ui.storyMenu;
 			} ).position( { top: 5 * 40, left: 0 } ).show() );
 
-		ui.levelCreationMenu = new UI.Group()
-			.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );
-
-		ui.levelCreationMenu.cancelButton = new UI.Button( "BACK",
-			function()
-			{
-				GameState.set( GameStates.Menu );
-			}, ui.levelCreationMenu ).position( { top: 0, left: 0 } ).show();
-
-		ui.levelCreationMenu.finishButton = new UI.Button( "Finish",
-			function()
-			{
-				if( polygon.length > 2 )
-				{
-					finishLevelEditing();
-					processLevel();
-				}
-			}, ui.levelCreationMenu ).position( { top: 40, left: 135 } ).show();
-
-		ui.levelCreationMenu.newButton = new UI.Button( "New",
-			function()
-			{
-				GameState.set( GameStates.LevelEditing );
-			}, ui.levelCreationMenu ).position( { top: 0, left: 135 } ).show();
-
-		ui.levelCreationMenu.undoButton = new UI.Button( "Undo",
-			function()
-			{
-				undoWall();
-			}, ui.levelCreationMenu ).position( { top: 40, left: 0 } ).show();
-
-		ui.levelCreationMenu.add( new UI.Text( "Import SVG:" )
-			.size( 150, 20 ).position( { top: 10, left: 300 } ).show() );
-		ui.levelCreationMenu.filePicker =
-			new UI.FilePicker( ".svg", onSvgSelected, ui.levelCreationMenu )
-				.position( { top: 35, left: 300 } ).show();
-
-		ui.levelCreationMenu.exportLink =
-			new UI.Link( "[JS Level File]", null, ui.levelCreationMenu )
-				.size( 130, 20 ).position( { top: 40, left: 0 } );
-
 		ui.ingameMenu = new UI.Group()
 			.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );
 
@@ -139,14 +98,8 @@ var ui =
 		ui.ingameMenu.nextButton = new UI.Button( "Next",
 			function()
 			{
-				loadLevel( ++currentLevel );
+				loadLevel( levels.indexOf( currentLevel ) + 1 );
 			}, ui.ingameMenu ).position( { top: 0, left: 135 } );
-
-//		ui.ingameMenu.undoButton = new UI.Button( "Undo",
-//			function()
-//			{
-//				undoGuard();
-//			}, ui.ingameMenu ).position( { top: 0, left: 135 } ).show();
 
 		ui.ingameMenu.overviewButton = new UI.Button( "Overview",
 			function()
@@ -154,8 +107,37 @@ var ui =
 				switchToOverview();
 			}, ui.ingameMenu ).position( { top: 0, left: 135 } );
 
-		ui.completionText = new UI.Text( "Level completed!" )
-			.position( { top: 100, left: 100 } ).cssClass( "title" );
+		ui.levelDetails = new UI.Group()
+			.position( { top: 0, left: 0.25 }, true )
+			.size( 0.5, 0, true ).cssClass( "details" );
+
+		ui.levelDetails.title = new UI.Text( "", ui.levelDetails )
+			.position( { top: 0, left: 0 } )
+			.size( 1, 0, true )
+			.cssClass( "title" ).show();
+
+		ui.levelDetails.description =
+			new UI.Text( "", ui.levelDetails )
+			.position( { top: 50, left: 0 } )
+			.size( 1, 0, true ).show();
+
+		ui.guardDetails = new UI.Group()
+			.position( { top: 0.25, right: 0.01 }, true )
+			.size( 200, 0 );
+
+		ui.guardDetails.budget = new UI.Text( "", ui.guardDetails )
+			.position( { top: 0, right: 0 } )
+			.size( 200, 50 )
+			.cssClass( "centered title" ).show();
+
+		ui.guardDetails.buttons = new UI.Group( null, ui.guardDetails )
+			.position( { top: 50, right: 0 } )
+			.size( 200, 0 )
+			.cssClass( "verticalMenu" ).show();
+
+		ui.completionText = new UI.Text( "LEVEL COMPLETED!" )
+			.position( { top: 0.4, left: 0 }, true )
+			.cssClass( "completion" );
 
 
 		ui.hint = new UI.Text( "" )

@@ -289,3 +289,25 @@ HalfEdge.prototype.pointDistance = function( p )
 {
 	return this.normal().dot( p.clone().sub( this.origin.pos ) );
 }
+
+HalfEdge.prototype.pointProjection = function( p )
+{
+	var op = p.clone().sub( this.origin.pos );
+	var vec = this.vector();
+	var proj = vec.dot( op ) / vec.lengthSq();
+
+	var distance;
+	if( proj < eps )
+	{
+		distance = this.origin.pos.distanceTo( p );
+	}
+	else if( proj > ( 1 - eps ) )
+	{
+		distance = this.next.origin.pos.distanceTo( p );
+	}
+	else
+	{
+		distance = this.normal().dot( op );
+	}
+	return { localCoordinate: proj, distance: distance };
+}

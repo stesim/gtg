@@ -1,6 +1,52 @@
 var UI =
 {
 
+create: function( tag )
+{
+	return document.createElement( tag );
+},
+
+text: function( content )
+{
+	return document.createTextNode( content );
+},
+
+linebreak: function()
+{
+	return document.createElement( "br" );
+},
+
+get: function( id )
+{
+	return document.getElementById( id );
+},
+
+show: function( elem )
+{
+	//elem.style.display = "initial";
+	elem.style.display = null;
+},
+
+hide: function( elem )
+{
+	elem.style.display = "none";
+},
+
+enable: function( elem )
+{
+	elem.disabled = false;
+},
+
+disable: function( elem )
+{
+	elem.disabled = true;
+},
+
+setText: function( elem, content )
+{
+	elem.textContent = content;
+},
+
 Control: function()
 {
 },
@@ -23,7 +69,7 @@ Text: function( text, group )
 
 Link: function( text, url, group )
 {
-	this._text = "";
+	this._text = text;
 	this._url = null;
 	this.group = null;
 
@@ -41,8 +87,8 @@ Link: function( text, url, group )
 
 Button: function( text, onclick, group )
 {
-	this._text = "";
-	this.onclick = onclick;
+	this._text = text;
+	this._onclick = onclick;
 	this.group = null;
 
 	this.elem = document.createElement( "button" );
@@ -97,31 +143,36 @@ Group: function( ctl, group )
 
 };
 
-UI.Control.prototype.position = function( pos )
+function _UI_PosString( pos, relative )
 {
-	if( pos.top )
+	return ( relative ? ( pos * 100 ) + "%" : pos + "px" );
+}
+
+UI.Control.prototype.position = function( pos, relative )
+{
+	if( pos.top !== undefined )
 	{
-		this.elem.style.top = pos.top + "px";
+		this.elem.style.top = _UI_PosString( pos.top, relative );
 	}
-	else if( pos.bottom )
+	else if( pos.bottom !== undefined )
 	{
-		this.elem.style.bottom = pos.bottom + "px";
+		this.elem.style.bottom = _UI_PosString( pos.bottom, relative );
 	}
-	if( pos.left )
+	if( pos.left !== undefined )
 	{
-		this.elem.style.left = pos.left + "px";
+		this.elem.style.left = _UI_PosString( pos.left, relative );
 	}
-	else if( pos.right )
+	else if( pos.right !== undefined )
 	{
-		this.elem.style.right = pos.right + "px";
+		this.elem.style.right = _UI_PosString( pos.right, relative );
 	}
 	return this;
 }
 
-UI.Control.prototype.size = function( width, height )
+UI.Control.prototype.size = function( width, height, relative )
 {
-	this.elem.style.width = width + "px";
-	this.elem.style.height = height + "px";
+	this.elem.style.width = _UI_PosString( width, relative );
+	this.elem.style.height = _UI_PosString( height, relative );
 	return this;
 }
 
@@ -204,14 +255,20 @@ UI.Link.prototype.url = function( url )
 
 UI.Button.prototype.text = UI.Text.prototype.text;
 
+UI.Button.prototype.onclick = function( onclick )
+{
+	this._onclick = onclick;
+	this.elem.onclick = onclick;
+	return this;
+}
+
 UI.Group.prototype.add = function( control )
 {
 	function addControl( grp, ctl )
 	{
 		if( ctl.group !== null )
 		{
-			var idx = ctl.group.controls.indexOf( ctl );
-			ctl.group.controls.splice( idx, 1 );
+			ctl.group.remove( ctl );
 		}
 
 		ctl.group = grp;
@@ -224,9 +281,9 @@ UI.Group.prototype.add = function( control )
 	{
 		if( Array.isArray( control ) )
 		{
-			for( ctl in control )
+			for( var i = 0; i < control.length; ++i )
 			{
-				addControl( this, ctl );
+				addControl( this, control[ i ] );
 			}
 		}
 		else
@@ -237,40 +294,10 @@ UI.Group.prototype.add = function( control )
 	return this;
 }
 
-//UI.Group.prototype.position = function( pos )
-//{
-//	if( pos.top )
-//	{
-//		this.elem.style.top = pos.top + "px";
-//	}
-//	else if( pos.bottom )
-//	{
-//		this.elem.style.bottom = pos.bottom + "px";
-//	}
-//	if( pos.left )
-//	{
-//		this.elem.style.left = pos.left + "px";
-//	}
-//	else if( pos.right )
-//	{
-//		this.elem.style.right = pos.right + "px";
-//	}
-//	return this;
-//}
-//
-//UI.Group.prototype.show = function()
-//{
-//	if( this.elem.parentNode === null )
-//	{
-//		document.body.appendChild( this.elem );
-//	}
-//
-//	this.elem.style.visibility = "visible";
-//	return this;
-//}
-//
-//UI.Group.prototype.hide = function()
-//{
-//	this.elem.style.visibility = "hidden";
-//	return this;
-//}
+UI.Group.prototype.remove = function( control )
+{
+	this.controls.splice( this.controls.indexOf( control ), 1 );
+	this.elem.removeChild( control.elem );
+
+	control.group = null;
+}
