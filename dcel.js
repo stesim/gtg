@@ -307,7 +307,7 @@ HalfEdge.prototype.pointProjection = function( p )
 	}
 	else
 	{
-		distance = this.normal().dot( op );
+		distance = Math.abs( this.normal().dot( op ) );
 	}
 	return { localCoordinate: proj, distance: distance };
 }

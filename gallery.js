@@ -515,10 +515,11 @@ function onMouseUp( event )
 function onMouseScroll( event )
 {
 	var e = window.event || event;
-	var delta = ( e.detail ? e.detail : e.wheelDelta / 120 );
 
-	if( !isInFirstPerson )
+	if( GameState.get() === GameStates.GuardPlacement && !isInFirstPerson )
 	{
+		var delta = ( e.detail ? e.detail : e.wheelDelta / 120 );
+
 		graphics.overview.mouseScroll( delta );
 	}
 

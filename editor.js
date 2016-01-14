@@ -2,6 +2,8 @@ var LevelEditor =
 {
 
 NORMALIZATION_SIZE: 1000,
+SNAP_THRESHOLD: 20,
+MIN_PICTURE_SIZE: 20,
 PICTUREOFFSETMIN: 30,
 PICTUREOFFSETMAX: 150,
 
@@ -11,13 +13,14 @@ points: new Array(),
 dcel: null,
 pictures: new Array(),
 pictureMeshes: new Array(),
-helperMesh: new THREE.Mesh(
-	new THREE.SphereGeometry( 12, 16, 16 ),
-	new THREE.MeshBasicMaterial( { color: 0xff0000 } ) ),
+helperMesh: null,
 mouseUpHandler: null,
+mouseMoveHandler: null,
+mouseScrollHandler: null,
 
-selectedID: 0,
-currentPictureSize: 50,
+selectedPictureID: 0,
+currentPictureSize: 20,
+currentPicturePreview: null,
 
 UI:
 {
@@ -56,12 +59,21 @@ Picture: function( id, edge, start, end )
 
 init: function()
 {
+	this.currentPictureSize = LevelEditor.MIN_PICTURE_SIZE;
+
+	this.helperMesh = new THREE.Mesh(
+		new THREE.PlaneGeometry( 1, 1 ),
+		graphics.pictureMaterials[ this.selectedPictureID ] );
+	this.helperMesh.scale.set(
+		this.currentPictureSize, this.currentPictureSize, 1 );
 	this.helperMesh.visible = false;
 
 	this.mouseUpHandler = this.onMouseUp.bind( this );
+	this.mouseMoveHandler = this.onMouseMove.bind( this );
+	this.mouseScrollHandler = this.onMouseScroll.bind( this );
 
 	this.UI.quit.onclick = function() { GameState.set( GameStates.Menu ); };
-	this.UI.newLevel.onclick = this.reset.bind( this );
+	this.UI.newLevel.onclick = ( function() { this.reset(); } ).bind( this );
 	this.UI.undo.onclick = this.undo.bind( this );
 	this.UI.finish.onclick = this.finalize.bind( this );
 
@@ -86,7 +98,7 @@ init: function()
 		graphics.levelMeshes.add( this.helperMesh );
 
 		this.addGeometryMeshes();
-		this.finalizeGeometry();
+		this.finalizeGeometryState();
 		this.repositionPictureMeshes();
 
 		UI.disable( this.UI.normalize );
@@ -118,6 +130,19 @@ init: function()
 
 reset: function( initial )
 {
+	if( initial === undefined || !initial )
+	{
+		graphics.clearLevelMeshes();
+		graphics.levelMeshes.add( this.helperMesh );
+
+		graphics.overview.reset();
+
+		if( this.geometryFinished && !this.picturesFinished )
+		{
+			this.finalizePictures();
+		}
+	}
+
 	this.geometryFinished = false;
 	this.picturesFinished = false;
 	this.points.length = 0;
@@ -126,14 +151,6 @@ reset: function( initial )
 	this.pictureMeshes.length = 0;
 
 	this.helperMesh.visible = false;
-
-	if( initial !== undefined && initial )
-	{
-		graphics.clearLevelMeshes();
-		graphics.levelMeshes.add( this.helperMesh );
-
-		graphics.overview.reset();
-	}
 
 	UI.setText( this.UI.title, "Construct level geometry" );
 
@@ -166,8 +183,8 @@ onLoad: function()
 
 	UI.show( this.UI.menu );
 
-	graphics.renderer.domElement.
-		addEventListener( "mouseup", this.mouseUpHandler, false );
+	graphics.renderer.domElement.addEventListener(
+		"mouseup", this.mouseUpHandler, false );
 },
 
 onExit: function()
@@ -185,8 +202,8 @@ onExit: function()
 
 	UI.hide( this.UI.title );
 
-	graphics.renderer.domElement.
-		removeEventListener( "mouseup", this.mouseUpHandler, false );
+	graphics.renderer.domElement.removeEventListener(
+		"mouseup", this.mouseUpHandler, false );
 },
 
 onMouseUp: function( event )
@@ -202,6 +219,13 @@ onMouseUp: function( event )
 		var p = graphics.screenToWorldPosition( coord );
 		if( p === null ) { return; }
 
+		if( this.points.length > 0 &&
+			p.distanceTo( this.points[ 0 ] ) < this.SNAP_THRESHOLD )
+		{
+			this.finalizeGeometry();
+			return;
+		}
+
 		this.points.push( p );
 
 		if( this.points.length > 1 )
@@ -214,23 +238,30 @@ onMouseUp: function( event )
 			graphics.levelMeshes.add( graphics.createPillarMesh( p ) );
 		}
 	}
-	else if( !this.picturesFinished )
+	else if( !this.picturesFinished && this.currentPicturePreview !== null )
 	{
-		var p = graphics.screenToWorldPosition( coord );
-		if( p === null ) { return; }
-
-		var closestEdge = findClosestDCELEdge( this.dcel, p );
-		if( closestEdge.distance < 10 )
+		var edgeIndex = this.dcel.edges.indexOf(
+			this.currentPicturePreview.edge );
+		for( var i = 0; i < this.pictures.length; ++i )
 		{
-			var halfLocalPicSize =
-				0.5 * this.currentPictureSize / closestEdge.edge.length();
-
-			this.addPicture(
-				this.selectedID,
-				this.dcel.edges.indexOf( closestEdge.edge ),
-				closestEdge.localCoordinate - halfLocalPicSize,
-				closestEdge.localCoordinate + halfLocalPicSize );
+			var picture = this.pictures[ i ];
+			if( picture.edge == edgeIndex &&
+				picture.start < this.currentPicturePreview.localCoordinate &&
+				this.currentPicturePreview.localCoordinate < picture.end )
+			{
+				this.removePicture( picture );
+				return;
+			}
 		}
+
+		var halfLocalPicSize = 0.5 * this.currentPictureSize /
+			this.currentPicturePreview.edge.length();
+
+		this.addPicture(
+			this.selectedPictureID,
+			this.dcel.edges.indexOf( this.currentPicturePreview.edge ),
+			this.currentPicturePreview.localCoordinate - halfLocalPicSize,
+			this.currentPicturePreview.localCoordinate + halfLocalPicSize );
 	}
 },
 
@@ -246,24 +277,32 @@ importGeometry: function( svg )
 
 		this.addGeometryMeshes();
 
-		this.finalizeGeometry();
+		this.finalizeGeometryState();
 	}
 },
 
 finalizeGeometry: function()
 {
+	graphics.levelMeshes.remove( graphics.levelMeshes.children[ 1 ] );
+	graphics.levelMeshes.add( graphics.createWallMesh(
+		this.points[ this.points.length - 1 ], this.points[ 0 ] ) );
+
+	this.dcel = new DCEL().fromVectorList( this.points );
+
+	graphics.levelMeshes.add(
+		graphics.createPolygonMesh( this.dcel, graphics.floorMaterial ) );
+
+	document.addEventListener( "mousemove", this.mouseMoveHandler, false );
+	document.addEventListener( "mousewheel", this.mouseScrollHandler, false );
+
+	this.geometryFinished = true;
+},
+
+finalizeGeometryState: function()
+{
 	if( this.points.length > 2 )
 	{
-		graphics.levelMeshes.remove( graphics.levelMeshes.children[ 1 ] );
-		graphics.levelMeshes.add( graphics.createWallMesh(
-			this.points[ this.points.length - 1 ], this.points[ 0 ] ) );
-
-		this.dcel = new DCEL().fromVectorList( this.points );
-
-		graphics.levelMeshes.add(
-			graphics.createPolygonMesh( this.dcel, graphics.floorMaterial ) );
-
-		this.geometryFinished = true;
+		this.finalizeGeometry();
 
 		UI.hide( this.UI.pickerWrapper );
 
@@ -277,7 +316,15 @@ finalizeGeometry: function()
 
 finalizePictures: function()
 {
+	document.removeEventListener( "mousemove", this.mouseMoveHandler, false );
+	document.removeEventListener( "mousewheel", this.mouseMoveHandler, false );
+
 	this.picturesFinished = true;
+},
+
+finalizePictureState: function()
+{
+	this.finalizePictures();
 
 	UI.setText( this.UI.title, "Level settings" );
 
@@ -295,11 +342,11 @@ finalize: function()
 {
 	if( !this.geometryFinished )
 	{
-		this.finalizeGeometry();
+		this.finalizeGeometryState();
 	}
 	else if( !this.picturesFinished )
 	{
-		this.finalizePictures();
+		this.finalizePictureState();
 	}
 },
 
@@ -344,6 +391,135 @@ undo: function()
 	}
 },
 
+clampPossiblePicturePosition: function( edge, position, size )
+{
+	var halfLocalPicSize = 0.5 * size / edge.length();
+	if( halfLocalPicSize > 0.5 )
+	{
+		return null;
+	}
+	else if( position - halfLocalPicSize < eps )
+	{
+		return halfLocalPicSize;
+	}
+	else if( position + halfLocalPicSize > ( 1 - eps ) )
+	{
+		return ( 1 - halfLocalPicSize );
+	}
+	else
+	{
+		return position;
+	}
+},
+
+determinePossiblePicturePosition: function( p )
+{
+	var closestEdge = findClosestDCELEdge( this.dcel, p );
+	if( closestEdge.distance < LevelEditor.SNAP_THRESHOLD )
+	{
+		closestEdge.localCoordinate = this.clampPossiblePicturePosition(
+			closestEdge.edge,
+			closestEdge.localCoordinate,
+			this.currentPictureSize );
+
+		if( closestEdge.localCoordinate === null )
+		{
+			return null;
+		}
+
+		return { edge: closestEdge.edge,
+			localCoordinate: closestEdge.localCoordinate };
+	}
+	else
+	{
+		return null;
+	}
+},
+
+updateHelperPosition: function()
+{
+	if( this.currentPicturePreview !== null )
+	{
+		var projPos = this.currentPicturePreview.edge.lerp(
+			this.currentPicturePreview.localCoordinate );
+		var normal = this.currentPicturePreview.edge.normal();
+
+		this.helperMesh.position.set(
+			projPos.x + 0.5 * normal.x,
+			projPos.y + 0.5 * normal.y,
+			0.5 * WALLHEIGHT );
+
+		this.helperMesh.lookAt( new THREE.Vector3(
+			this.helperMesh.position.x + normal.x,
+			this.helperMesh.position.y + normal.y,
+			this.helperMesh.position.z ) );
+
+		this.helperMesh.visible = true;
+	}
+	else
+	{
+		this.helperMesh.visible = false;
+	}
+},
+
+onMouseMove: function( event )
+{
+	if( !Dragging.active )
+	{
+		var coord =
+			new THREE.Vector2( event.clientX, graphics.HEIGHT - event.clientY );
+
+		var p = graphics.screenToWorldPosition( coord );
+		if( p === null ) { return; }
+
+		this.currentPicturePreview = this.determinePossiblePicturePosition( p );
+
+		this.updateHelperPosition( p );
+	}
+},
+
+updateHelperSize: function()
+{
+	if( this.currentPictureSize > this.helperMesh.scale.y )
+	{
+		var originalPosition = this.currentPicturePreview.localCoordinate;
+		this.currentPicturePreview.localCoordinate =
+			this.clampPossiblePicturePosition(
+				this.currentPicturePreview.edge,
+				this.currentPicturePreview.localCoordinate,
+				this.currentPictureSize );
+
+		if( this.currentPicturePreview.localCoordinate !== originalPosition )
+		{
+			this.updateHelperPosition();
+		}
+	}
+
+	this.helperMesh.scale.set(
+		this.currentPictureSize, this.currentPictureSize, 1 );
+},
+
+onMouseScroll: function( event )
+{
+	var e = window.event || event;
+	var delta = ( e.detail ? e.detail : e.wheelDelta / 120 );
+	if( delta === 0 ) { return; }
+
+	if( this.currentPicturePreview !== null )
+	{
+		this.currentPictureSize = clamp(
+			this.currentPictureSize + delta * 5,
+			LevelEditor.MIN_PICTURE_SIZE,
+			Math.min( WALLHEIGHT, this.currentPicturePreview.edge.length() ) );
+
+		this.updateHelperSize();
+	}
+	else
+	{
+		graphics.overview.mouseScroll( delta );
+	}
+},
+
 addPicture: function( id, edgeIndex, start, end )
 {
 	var edge = this.dcel.edges[ edgeIndex ];
@@ -357,6 +533,15 @@ addPicture: function( id, edgeIndex, start, end )
 	graphics.levelMeshes.add( mesh );
 
 	this.pictures.push( new LevelEditor.Picture( id, edgeIndex, start, end ) );
+},
+
+removePicture: function( picture )
+{
+	var index = this.pictures.indexOf( picture );
+	this.pictures.splice( index, 1 );
+
+	graphics.levelMeshes.remove( this.pictureMeshes[ index ] );
+	this.pictureMeshes.splice( index, 1 );
 },
 
 placeRandomPictures: function()

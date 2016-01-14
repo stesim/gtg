@@ -46,6 +46,15 @@ function extendedLineIntersection( a, b, p, q )
 	return [ ab.multiplyScalar( s ).add( a ), s, t ];
 }
 
+function isPointOnSegment( p, a, b )
+{
+	var line = b.clone().sub( a );
+	var proj = line.dot( p.clone().sub( a ) ) / line.lengthSq();
+
+	return ( Math.abs( linePointDistance( a, b, p ) ) < eps &&
+		proj > -eps && proj < ( 1 + eps ) );
+}
+
 function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
 {
 	var dir = b.clone().sub( a );
