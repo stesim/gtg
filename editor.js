@@ -87,6 +87,7 @@ init: function()
 
 		this.addGeometryMeshes();
 		this.finalizeGeometry();
+		this.repositionPictureMeshes();
 
 		UI.disable( this.UI.normalize );
 	} ).bind( this );
@@ -389,6 +390,24 @@ placeRandomPictures: function()
 	} while( iter != this.dcel.edges[ 0 ] );
 },
 
+repositionPictureMeshes: function()
+{
+	for( var i = 0; i < this.pictures.length; ++i )
+	{
+		var picture = this.pictures[ i ];
+		var edge = this.dcel.edges[ picture.edge ];
+		var pos = edge.lerp( 0.5 * ( picture.start + picture.end ) );
+
+		var size = ( picture.end - picture.start ) * edge.length();
+
+		var mesh = graphics.createPictureMesh(
+			picture.id, pos, edge.normal(), size );
+		graphics.levelMeshes.add( mesh );
+
+		this.pictureMeshes[ i ] = mesh;
+	}
+},
+
 createExportLink: function()
 {
 	var points = new Array( this.points.length );
@@ -548,6 +567,15 @@ normalizeGeometry: function()
 	for( var i = 0; i < this.points.length; ++i )
 	{
 		this.points[ i ].sub( center ).multiplyScalar( scale );
+	}
+
+	for( var i = 0; i < this.pictures.length; ++i )
+	{
+		var picture = this.pictures[ i ];
+		var mid = 0.5 * ( picture.start + picture.end );
+		
+		picture.start = mid + ( picture.start - mid ) / scale;
+		picture.end   = mid + ( picture.end   - mid ) / scale;
 	}
 },
 
