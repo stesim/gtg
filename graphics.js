@@ -54,6 +54,8 @@ var graphics =
 
 	topViewZoom: 6.0,
 
+	overview: null,
+
 	wallMaterial: null,
 	floorMaterial: null,
 	visbilityMaterial: null,
@@ -83,6 +85,8 @@ var graphics =
 		graphics.resetFxCamera();
 		graphics.fxView.update();
 		graphics.scene.add( graphics.fxView.camera );
+
+		graphics.overview = new OverviewController( graphics.fxView.camera );
 
 		graphics.topView.camera.position.set( 0, 0, 500 );
 		graphics.topView.camera.up.set( 0, 1, 0 );
@@ -342,5 +346,18 @@ var graphics =
 		}
 
 		return new THREE.Mesh( geom, material );
+	},
+
+	mouseEventCoord: function( event, coord )
+	{
+		if( coord )
+		{
+			return coord.set( event.clientX, graphics.HEIGHT - event.clientY );
+		}
+		else
+		{
+			return new THREE.Vector2(
+				event.clientX, graphics.HEIGHT - event.clientY );
+		}
 	},
 }

@@ -82,9 +82,17 @@ var GameStates =
 			ui.guardDetails.show();
 
 			selectGuardType( GuardTypes[ currentLevel.guardTypes[ 0 ].type ] );
+
+			Dragging.onstart = onDragStart;
+			Dragging.onmove = onDragMove;
+			Dragging.onstop = onDragStop;
 		},
 		function( newState )
 		{
+			Dragging.onstart = null;
+			Dragging.onmove = null;
+			Dragging.onstop = null;
+
 			if( isInFirstPerson )
 			{
 				switchToOverview();

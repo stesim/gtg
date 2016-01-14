@@ -113,10 +113,10 @@ init: function()
 		this.UI.guardQuantities.push( number );
 	}
 
-	this.reset();
+	this.reset( true );
 },
 
-reset: function()
+reset: function( initial )
 {
 	this.geometryFinished = false;
 	this.picturesFinished = false;
@@ -127,8 +127,13 @@ reset: function()
 
 	this.helperMesh.visible = false;
 
-	graphics.clearLevelMeshes();
-	graphics.levelMeshes.add( this.helperMesh );
+	if( initial !== undefined && initial )
+	{
+		graphics.clearLevelMeshes();
+		graphics.levelMeshes.add( this.helperMesh );
+
+		graphics.overview.reset();
+	}
 
 	UI.setText( this.UI.title, "Construct level geometry" );
 
@@ -152,7 +157,10 @@ onLoad: function()
 {
 	graphics.levelMeshes.add( this.helperMesh );
 
-	graphics.resetFxCamera();
+	graphics.overview.activate();
+	Dragging.onstart = this.onDragStart.bind( this );
+	Dragging.onmove = this.onDragMove.bind( this );
+	Dragging.onstop = this.onDragStop.bind( this );
 
 	UI.show( this.UI.title );
 
@@ -168,6 +176,11 @@ onExit: function()
 
 	graphics.levelMeshes.remove( this.helperMesh );
 
+	graphics.overview.deactivate();
+	Dragging.onstart = null;
+	Dragging.onmove = null;
+	Dragging.onstop = null;
+
 	UI.hide( this.UI.menu );
 
 	UI.hide( this.UI.title );
@@ -179,6 +192,8 @@ onExit: function()
 onMouseUp: function( event )
 {
 	event.preventDefault();
+	if( Dragging.effective ) { return; }
+
 	var coord =
 		new THREE.Vector2( event.clientX, graphics.HEIGHT - event.clientY );
 
@@ -577,6 +592,20 @@ normalizeGeometry: function()
 		picture.start = mid + ( picture.start - mid ) / scale;
 		picture.end   = mid + ( picture.end   - mid ) / scale;
 	}
+},
+
+onDragStart: function()
+{
+},
+
+onDragStop: function()
+{
+	graphics.overview.mouseDragStop();
+},
+
+onDragMove: function()
+{
+	graphics.overview.mouseDrag( Dragging.delta );
 },
 
 }

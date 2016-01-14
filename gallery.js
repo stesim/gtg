@@ -6,13 +6,6 @@ var ZAXIS = new THREE.Vector3( 0, 0, 1 );
 
 var stats;
 var time;
-var dragging =
-{
-	active: false,
-	start: null,
-	last: null,
-	//delta: null,
-};
 var keymap = {};
 
 var currentLevel = null;
@@ -60,6 +53,8 @@ function init()
 	document.addEventListener( "keyup", onKeyUp, false );
 
 	ui.init();
+
+	Dragging.init();
 
 	LevelEditor.init();
 
@@ -170,10 +165,7 @@ function restart()
 	polygon.length = 0;
 	graphics.clearLevelMeshes();
 
-	graphics.resetFxCamera();
-	lastFxCamRotation = 0;
-	lastOverviewCamRotation = 0;
-	lastOverviewCamPosition.copy( graphics.fxView.camera.position );
+	graphics.overview.reset();
 
 	ui.hint.cancel();
 }
@@ -285,6 +277,8 @@ function loadLevel( level )
 	guards.length = 0;
 
 	restart();
+
+	graphics.overview.activate();
 
 	currentLevel = levels[ level ];
 
@@ -407,6 +401,54 @@ function findGuardNear( p )
 	return null;
 }
 
+function onDragStart()
+{
+}
+
+function onDragStop()
+{
+	if( pickedGuard !== null )
+	{
+		var p = graphics.screenToWorldPosition( Dragging.last );
+		if( p === null ) { return; }
+
+		if( dcel.faces[ 0 ].contains( p ) )
+		{
+			moveGuard( pickedGuard, p );
+			checkCompletion();
+		}
+		else
+		{
+			removeGuard( pickedGuard );
+		}
+	}
+	else
+	{
+		graphics.overview.mouseDragStop();
+	}
+}
+
+function onDragMove()
+{
+	if( isInFirstPerson )
+	{
+		graphics.fxView.camera.rotation.y =
+			( lastFxCamRotation - Dragging.delta.x / 250.0 );
+	}
+	else if( pickedGuard === null )
+	{
+		graphics.overview.mouseDrag( Dragging.delta );
+	}
+	else
+	{
+		var p = graphics.screenToWorldPosition( Dragging.last );
+		if( p !== null )
+		{
+			pickedGuard.guardMesh.position.set( p.x, p.y, 0 );
+		}
+	}
+}
+
 function onMouseDown( event )
 {
 	event.preventDefault();
@@ -417,8 +459,6 @@ function onMouseDown( event )
 
 		var coord = new THREE.Vector2( event.clientX,
 									   graphics.HEIGHT - event.clientY );
-
-		startDragging( coord );
 
 		if( !isInFirstPerson )
 		{
@@ -438,68 +478,29 @@ function onMouseUp( event )
 	var coord = new THREE.Vector2( event.clientX,
 	                               graphics.HEIGHT - event.clientY );
 
-	if( dragging.active )
-	{
-		if( isInFirstPerson )
-		{
-			lastFxCamRotation = graphics.fxView.camera.rotation.y;
-		}
-		else
-		{
-			if( moveOverviewByDrag )
-			{
-				lastOverviewCamPosition.copy( graphics.fxView.camera.position );
-			}
-			else
-			{
-				lastOverviewCamRotation -=
-					( dragging.last.x - dragging.start.x ) / 250.0;
-			}
-		}
-
-		stopDragging();
-	}
-
-	if( GameState.get() === GameStates.GuardPlacement )
+	if( GameState.get() === GameStates.GuardPlacement &&
+		!Dragging.effective )
 	{
 		if( !isInFirstPerson )
 		{
-			if( pickedGuard === null && !dragging.effective )
+			if( pickedGuard === null )
 			{
 				var p = graphics.screenToWorldPosition( coord );
 				if( p === null ) { return; }
 
 				if( dcel.faces[ 0 ].contains( p ) )
 				{
-					//addOrMoveGuard( null, p );
 					addGuard( p );
-
 					checkCompletion();
 				}
 			}
-			else if( !dragging.effective )
+			else
 			{
 				switchToFirstPerson( pickedGuard );
+				pickedGuard = null;
 			}
-			else if( pickedGuard !== null )
-			{
-				var p = graphics.screenToWorldPosition( coord );
-				if( p === null ) { return; }
-
-				if( dcel.faces[ 0 ].contains( p ) )
-				{
-					//addOrMoveGuard( pickedGuard, p );
-					moveGuard( pickedGuard, p );
-					checkCompletion();
-				}
-				else
-				{
-					removeGuard( pickedGuard );
-				}
-			}
-			pickedGuard = null;
 		}
-		else if( !dragging.effective )
+		else
 		{
 			var p = graphics.screenToWorldPosition( coord );
 			if( p !== null && dcel.faces[ 0 ].contains( p ) )
@@ -511,48 +512,6 @@ function onMouseUp( event )
 	}
 }
 
-function onMouseDrag( event )
-{
-	var coord = new THREE.Vector2( event.clientX,
-	                               graphics.HEIGHT - event.clientY );
-
-	//dragging.delta = coord.clone().sub( dragging.last );
-	dragging.effective = true;
-	dragging.last = coord;
-
-	var diff = dragging.last.clone().sub( dragging.start );
-
-	if( isInFirstPerson )
-	{
-		graphics.fxView.camera.rotation.y =
-			( lastFxCamRotation - diff.x / 250.0 );
-	}
-	else if( pickedGuard === null )
-	{
-		if( moveOverviewByDrag )
-		{
-			graphics.fxView.camera.position.x =
-				( lastOverviewCamPosition.x - diff.x );
-			graphics.fxView.camera.position.y =
-				( lastOverviewCamPosition.y - diff.y );
-		}
-		else
-		{
-			graphics.fxView.camera.position.set( 0, -200, 700 ).applyAxisAngle(
-				ZAXIS, lastOverviewCamRotation - diff.x / 250.0 );
-			graphics.fxView.camera.lookAt( graphics.scene.position );
-		}
-	}
-	else
-	{
-		var p = graphics.screenToWorldPosition( coord );
-		if( p !== null )
-		{
-			pickedGuard.guardMesh.position.set( p.x, p.y, 0 );
-		}
-	}
-}
-
 function onMouseScroll( event )
 {
 	var e = window.event || event;
@@ -560,8 +519,7 @@ function onMouseScroll( event )
 
 	if( !isInFirstPerson )
 	{
-		graphics.fxView.camera.position.z =
-			clamp( graphics.fxView.camera.position.z - delta * 50, 50, 700 );
+		graphics.overview.mouseScroll( delta );
 	}
 
 	return false;
@@ -571,6 +529,8 @@ function switchToFirstPerson( guard )
 {
 	isInFirstPerson = true;
 	firstPersonGuard = guard;
+
+	graphics.overview.deactivate();
 
 	graphics.fxView.camera.position.set(
 		guard.position.x,
@@ -596,7 +556,7 @@ function switchToOverview()
 
 	var guard = firstPersonGuard;
 
-	graphics.lookDirArrow.visible = true;
+	graphics.lookDirArrow.visible = false;
 
 	graphics.fxView.camera.remove( guard.guardMesh );
 	moveGuard( firstPersonGuard,
@@ -605,30 +565,12 @@ function switchToOverview()
 			graphics.fxView.camera.position.y ) );
 	graphics.levelMeshes.add( guard.guardMesh );
 
-	graphics.resetFxCamera();
-	graphics.fxView.camera.position.copy( lastOverviewCamPosition );
+	graphics.overview.activate();
 
 	isInFirstPerson = false;
 	firstPersonGuard = null;
 
 	checkCompletion();
-}
-
-function startDragging( coord )
-{
-	document.addEventListener( "mousemove", onMouseDrag, false );
-
-	dragging.active = true;
-	dragging.effective = false;
-	dragging.start = coord;
-	dragging.last = dragging.start;
-	//dragging.delta = new THREE.Vector2( 0, 0 );
-}
-
-function stopDragging()
-{
-	document.removeEventListener( "mousemove", onMouseDrag, false );
-	dragging.active = false;
 }
 
 function isPictureOnEdge( picture, edge )
