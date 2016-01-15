@@ -40,19 +40,24 @@ DCEL.prototype.fromVectorList = function( vectors )
 		return ( intersectedSegments % 2 == 1 );
 	}
 
-	if( vectors.length < 3 )
+	this.edges.length = 0;
+	this.vertices.length = 0;
+	this.faces.length = 0;
+
+	if( vectors.length === 1 )
 	{
-		return null;
+		this.vertices.push( new Vertex( null, vectors[ 0 ] ) );
+		return this;
+	}
+	else if( vectors.length < 3 )
+	{
+		return this;
 	}
 
 	if( !checkIfCCW( vectors ) )
 	{
 		vectors.reverse();
 	}
-
-	this.edges.length = 0;
-	this.vertices.length = 0;
-	this.faces.length = 0;
 
 	var root = new HalfEdge();
 	var face = new Face( root );

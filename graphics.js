@@ -30,7 +30,7 @@ var graphics =
 			width: 0.25,
 			height: 0.25,
 			absolute: false
-		}
+		},
 	},
 	fxView:
 	{
@@ -82,7 +82,6 @@ var graphics =
 			1.0 / graphics.topView.viewport.width,
 			1.0 / graphics.topView.viewport.height ) + 1;
 
-		graphics.resetFxCamera();
 		graphics.fxView.update();
 		graphics.scene.add( graphics.fxView.camera );
 
@@ -160,11 +159,19 @@ var graphics =
 		graphics.renderingEnabled = false;
 	},
 
-	resetFxCamera: function()
+	setFxHorizontalFOV: function( hfov )
 	{
-		graphics.fxView.camera.up.set( 0, 1, 0 );
-		graphics.fxView.camera.position.set( 0, 0, 700 );
-		graphics.fxView.camera.rotation.set( 0, 0, 0 );
+		hfov = Math.max( hfov, Math.PI );
+		var aspect = graphics.fxView.camera.aspect;
+		var vfov = 2 * Math.atan( Math.tan( 0.5 * hfov ) / aspect );
+		graphics.fxView.camera.fov = vfov * 180 / Math.PI;
+		graphics.fxView.camera.updateProjectionMatrix();
+	},
+
+	resetFxFOV: function()
+	{
+		graphics.fxView.camera.fov = 90;
+		graphics.fxView.camera.updateProjectionMatrix();
 	},
 
 	render: function()
@@ -323,6 +330,11 @@ var graphics =
 
 	createPolygonMesh: function( dcel, material, color )
 	{
+		if( dcel.faces.length <= 0 )
+		{
+			return null;
+		}
+
 		var shape = new THREE.Shape();
 		shape.moveTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
 

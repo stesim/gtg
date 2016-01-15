@@ -73,7 +73,7 @@ var ui =
 			};
 		for( var i = 0; i < levels.length; ++i )
 		{
-			ui.levelsMenu.add( new UI.Button( "Level " + ( i + 1 ),
+			ui.levelsMenu.add( new UI.Button( levels[ i ].name,
 				levelOnclick.bind( this, i ) )
 					.position( { top: 40 * ( i % 4 ), left: 175 * Math.floor( i / 4 ) } ).show() );
 		}

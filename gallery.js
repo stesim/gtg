@@ -350,10 +350,6 @@ function addGuard( p )
 	else
 	{
 		var guard = selectedGuardType.create( p, dcel );
-
-		graphics.levelMeshes.add( guard.guardMesh );
-		graphics.levelMeshes.add( guard.visibilityMesh );
-
 		guards.push( guard );
 
 		currentBudget -= guard.type.cost;
@@ -368,9 +364,7 @@ function moveGuard( guard, p )
 {
 	removePictureVisibilityFrom( guard );
 
-	graphics.levelMeshes.remove( guard.visibilityMesh );
 	guard.move( p, dcel );
-	graphics.levelMeshes.add( guard.visibilityMesh );
 
 	addPictureVisibilityFrom( guard );
 }
@@ -379,9 +373,7 @@ function removeGuard( guard )
 {
 	removePictureVisibilityFrom( guard );
 
-	graphics.levelMeshes.remove( guard.guardMesh );
-	graphics.levelMeshes.remove( guard.visibilityMesh );
-
+	guard.removeMeshes();
 	guards.splice( guards.indexOf( guard ), 1 );
 
 	currentBudget += guard.type.cost;
@@ -403,28 +395,40 @@ function findGuardNear( p )
 
 function onDragStart()
 {
+	if( !isInFirstPerson && pickedGuard !== null &&
+		pickedGuard.visibilityMesh !== null )
+	{
+		pickedGuard.visibilityMesh.visible = false;
+	}
 }
 
 function onDragStop()
 {
-	if( pickedGuard !== null )
+	if( !isInFirstPerson )
 	{
-		var p = graphics.screenToWorldPosition( Dragging.last );
-		if( p === null ) { return; }
-
-		if( dcel.faces[ 0 ].contains( p ) )
+		if( pickedGuard !== null )
 		{
-			moveGuard( pickedGuard, p );
-			checkCompletion();
+			var p = graphics.screenToWorldPosition( Dragging.last );
+			if( p === null ) { return; }
+
+			if( dcel.faces[ 0 ].contains( p ) )
+			{
+				moveGuard( pickedGuard, p );
+				checkCompletion();
+			}
+			else
+			{
+				removeGuard( pickedGuard );
+			}
 		}
 		else
 		{
-			removeGuard( pickedGuard );
+			graphics.overview.mouseDragStop();
 		}
 	}
 	else
 	{
-		graphics.overview.mouseDragStop();
+		lastFxCamRotation = clampAngle( graphics.fxView.camera.rotation.y );
 	}
 }
 
@@ -530,6 +534,7 @@ function switchToFirstPerson( guard )
 {
 	isInFirstPerson = true;
 	firstPersonGuard = guard;
+	lastFxCamRotation = guard.direction - 0.5 * Math.PI;
 
 	graphics.overview.deactivate();
 
@@ -546,7 +551,15 @@ function switchToFirstPerson( guard )
 
 	graphics.lookDirArrow.visible = true;
 
-	graphics.levelMeshes.remove( guard.visibilityMesh );
+	if( guard.visibilityMesh !== null )
+	{
+		guard.visibilityMesh.visible = false;
+	}
+
+	if( guard.type.enterFirstPerson )
+	{
+		guard.type.enterFirstPerson();
+	}
 
 	ui.ingameMenu.overviewButton.show();
 }
@@ -556,6 +569,11 @@ function switchToOverview()
 	ui.ingameMenu.overviewButton.hide();
 
 	var guard = firstPersonGuard;
+	if( guard.type.exitFirstPerson )
+	{
+		guard.type.exitFirstPerson();
+	}
+	guard.direction = graphics.fxView.camera.rotation.y + 0.5 * Math.PI;
 
 	graphics.lookDirArrow.visible = false;
 
@@ -600,16 +618,38 @@ function isPictureOnEdge( picture, edge )
 		  isPointOnSegment( edge.next.origin.pos, start, end ) ) );
 }
 
+function isPictureVisibleByGuard( picture, guard )
+{
+	if( guard.polygon.vertices.length == 1 )
+	{
+		return isPointOnSegment(
+			guard.polygon.vertices[ 0 ].pos,
+			dcel.edges[ picture.edge ].lerp( picture.start ),
+			dcel.edges[ picture.edge ].lerp( picture.end ) );
+	}
+	else
+	{
+		for( var j = 0; j < guard.polygon.edges.length; ++j )
+		{
+			if( isPictureOnEdge( picture, guard.polygon.edges[ j ] ) )
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 function addPictureVisibilityFrom( guard )
 {
 	for( var i = 0; i < currentLevel.pictures.length; ++i )
 	{
-		if( pictureVisibility[ i ] !== null ) { continue; }
+		if( pictureVisibility[ i ] !== null ) { continue }
 
-		for( var j = 0; j < guard.polygon.edges.length; ++j )
+		for( var j = 0; j < guards.length; ++j )
 		{
-			if( isPictureOnEdge( currentLevel.pictures[ i ],
-			                     guard.polygon.edges[ j ] ) )
+			var guard = guards[ j ];
+			if( isPictureVisibleByGuard( currentLevel.pictures[ i ], guard ) )
 			{
 				pictureVisibility[ i ] = guard;
 				break;

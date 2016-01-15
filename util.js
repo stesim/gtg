@@ -5,6 +5,20 @@ function clamp( x, min, max )
 	return ( x < min ? min : ( x > max ? max : x ) );
 }
 
+function clampAngle( phi )
+{
+	var TWOPI = 2 * Math.PI;
+	if( phi > Math.PI )
+	{
+		phi -= Math.ceil( phi / TWOPI ) * TWOPI;
+	}
+	if( phi < -Math.PI )
+	{
+		phi -= Math.floor( phi / TWOPI ) * TWOPI;
+	}
+	return phi;
+}
+
 function vert2str( v )
 {
 	return ( "( " + v.pos.x + ", " + v.pos.y + " )" );

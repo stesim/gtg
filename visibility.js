@@ -1,24 +1,18 @@
-function visibility( dcel, p )
+function visibility( dcel, p, opt )
 {
-	function angle( p )
+	if( !opt ) { opt = {}; }
+	if( !opt.direction ) { opt.direction = 0; };
+
+	opt.direction = clampAngle( opt.direction );
+
+	function angle( v )
 	{
-		return Math.atan2( p.y, p.x );
+		return clampAngle( Math.atan2( v.y - p.y, v.x - p.x ) - opt.direction );
 	}
 
-	function clampAngle( phi )
+	function isAngleZero( alpha )
 	{
-		if( phi > Math.PI )
-		{
-			return ( phi - 2 * Math.PI );
-		}
-		else if( phi < -Math.PI )
-		{
-			return ( phi + 2 * Math.PI );
-		}
-		else
-		{
-			return phi;
-		}
+		return ( Math.abs( clampAngle( alpha ) ) < eps );
 	}
 
 	function findCoincidingVertex( vertices, p )
@@ -76,12 +70,10 @@ function visibility( dcel, p )
 		}
 	}
 
-	function sortVertices( u, v )
+	function sortPredicate( u, v )
 	{
-		var diff = clampAngle(
-			Math.atan2( u.pos.y - p.y, u.pos.x - p.x ) -
-			Math.atan2( v.pos.y - p.y, v.pos.x - p.x ) );
-		if( Math.abs( diff ) < eps )
+		var diff = angle( u.pos ) - angle( v.pos );
+		if( isAngleZero( diff ) )
 		{
 			return ( p.distanceToSquared( u.pos ) -
 				p.distanceToSquared( v.pos ) );
@@ -92,55 +84,61 @@ function visibility( dcel, p )
 		}
 	}
 
-	var visVectors = new Array();
-
-	var vertices = dcel.vertices.slice();
-
-	var coincidingVertex = findCoincidingVertex( vertices, p );
-	var pIsOnVertex = ( coincidingVertex !== null );
-	var startIndex = 0;
-	if( pIsOnVertex )
+	function initializeVertexList( vertices, visVectors )
 	{
-		vertices.splice( vertices.indexOf( coincidingVertex ), 1 );
-
-		vertices.sort( sortVertices );
-
-		var u = coincidingVertex.edge.next.origin;
-		var v = coincidingVertex.edge.prev.origin;
-		if( clampAngle(
-			Math.atan2( u.pos.y - p.y, u.pos.x - p.x ) -
-			Math.atan2( v.pos.y - p.y, v.pos.x - p.x ) ) < 0 )
+		var coincidingVertex = findCoincidingVertex( vertices, p );
+		var pIsOnVertex = ( coincidingVertex !== null );
+		var startIndex = 0;
+		if( pIsOnVertex )
 		{
-			startIndex =
-				vertices.indexOf( coincidingVertex.isConvex() ? u : v );
+			vertices.splice( vertices.indexOf( coincidingVertex ), 1 );
+
+			vertices.sort( sortPredicate );
+
+			var u = coincidingVertex.edge.next.origin;
+			var v = coincidingVertex.edge.prev.origin;
+			if( clampAngle( angle( u.pos ) - angle( v.pos ) ) > 0 )
+			{
+				startIndex =
+					vertices.indexOf( coincidingVertex.isConvex() ? v : u );
+			}
+			else
+			{
+				startIndex =
+					vertices.indexOf( coincidingVertex.isConvex() ? u : v );
+			}
 		}
 		else
 		{
-			startIndex =
-				vertices.indexOf( coincidingVertex.isConvex() ? v : u );
+			vertices.sort( sortPredicate );
 		}
 
-		visVectors.push( coincidingVertex.pos.clone() );
-	}
-	else
-	{
-		vertices.sort( sortVertices );
+		if( opt.minAngle || opt.maxAngle || pIsOnVertex )
+		{
+			visVectors.push( p.clone() );
+		}
+
+		return startIndex;
 	}
 
+	var visVectors = new Array();
+
+	var vertices = dcel.vertices.slice();
+	var startIndex = initializeVertexList( vertices, visVectors );
+
+	console.log( vert2str( vertices[ startIndex ] ) + " (" + angle( vertices[ startIndex ].pos ) + ")" );
+
+	var minAngleReached = ( opt.minAngle ? false : true );
+	var maxAngleReached = ( opt.maxAngle ? false : true );
 	for( var i = 0; i < vertices.length; ++i )
 	{
 		var vertex = vertices[ ( i + startIndex ) % vertices.length ];
-
-		var v  = vertex.pos.clone().sub( p );
-		var vn = vertex.edge.next.origin.pos.clone().sub( p );
-		var vp = vertex.edge.prev.origin.pos.clone().sub( p );
-
-		var alpha = angle( v );
+		var alpha = angle( vertex.pos );
 
 		var numCollinear = 0;
 		for( var j = i + 1; j < vertices.length; ++j )
 		{
-			if( Math.abs( clampAngle( angle( vertices[ j ] ) - alpha ) ) < eps )
+			if( isAngleZero( angle( vertices[ j ].pos ) - alpha ) )
 			{
 				++numCollinear;
 			}
@@ -148,6 +146,51 @@ function visibility( dcel, p )
 			{
 				break;
 			}
+		}
+
+		if( !minAngleReached )
+		{
+			if( isAngleZero( alpha - opt.minAngle ) )
+			{
+				minAngleReached = true;
+			}
+			else if( alpha > opt.minAngle )
+			{
+				var intersection = findClosestDCELHalfLineIntersection(
+					dcel, p, new THREE.Vector2(
+						Math.cos( opt.direction + opt.minAngle ),
+						Math.sin( opt.direction + opt.minAngle ) ).add( p ) );
+				intersection = intersection.intersection[ 0 ];
+
+				if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
+				{
+					visVectors.push( intersection );
+				}
+
+				minAngleReached = true;
+			}
+			else
+			{
+				i += numCollinear;
+				continue;
+			}
+		}
+
+		if( opt.maxAngle && alpha - opt.maxAngle >= eps )
+		{
+			var intersection = findClosestDCELHalfLineIntersection(
+				dcel, p, new THREE.Vector2(
+					Math.cos( opt.direction + opt.maxAngle ),
+					Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
+			intersection = intersection.intersection[ 0 ];
+
+			if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
+			{
+				visVectors.push( intersection );
+			}
+
+			maxAngleReached = true;
+			break;
 		}
 
 		var intersection = findClosestDCELHalfLineIntersection(
@@ -173,7 +216,7 @@ function visibility( dcel, p )
 				for( var j = 1; j < numCollinear; ++j )
 				{
 					var idx = ( ( i + j + startIndex ) % vertices.length );
-					if( p.distanceToSquared( vertices[ idx ].pos ) - distInterSq > eps )
+					if( p.distanceToSquared( vertices[ idx ].pos ) - distInterSq > eps ) // TODO: swap cases, so "if ... < eps"
 					{
 						break;
 					}
@@ -206,6 +249,22 @@ function visibility( dcel, p )
 		}
 		i += numCollinear;
 	}
+
+	if( minAngleReached && !maxAngleReached )
+	{
+		var intersection = findClosestDCELHalfLineIntersection(
+			dcel, p, new THREE.Vector2(
+				Math.cos( opt.direction + opt.maxAngle ),
+				Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
+		intersection = intersection.intersection[ 0 ];
+
+		if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
+		{
+			visVectors.push( intersection );
+		}
+	}
+
+	console.log( visVectors );
 
 	return new DCEL().fromVectorList( visVectors );
 }
