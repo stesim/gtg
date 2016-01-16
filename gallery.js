@@ -93,8 +93,8 @@ function update()
 			graphics.fxView.camera.position.x,
 			graphics.fxView.camera.position.y );
 
-		var halfLineIntersection = findClosestDCELHalfLineIntersection(
-			dcel, prevPosition, newPosition );
+		var halfLineIntersection = findClosestDCELFaceHalfLineIntersection(
+			dcel, dcel.faces[ 0 ], prevPosition, newPosition );
 
 		var closestIntersection = null;
 		var intersectedEdge = null;
@@ -218,27 +218,20 @@ function removeGuardButtons()
 
 function loadLevelGeometry()
 {
-	polygon = new Array( currentLevel.geometry.length );
-	for( var i = 0; i < currentLevel.geometry.length; ++i )
+	polygon = toVectorArray( currentLevel.geometry );
+	
+	var holes = new Array();
+	if( currentLevel.holes )
 	{
-		polygon[ i ] = new THREE.Vector2(
-			currentLevel.geometry[ i ][ 0 ], currentLevel.geometry[ i ][ 1 ] );
+		for( var i = 0; i < currentLevel.holes.length; ++i )
+		{
+			holes.push( toVectorArray( currentLevel.holes[ i ] ) );
+		}
 	}
 
-	for( var i = 1; i < polygon.length; ++i )
-	{
-		graphics.levelMeshes.add( graphics.createWallMesh(
-			polygon[ i - 1 ], polygon[ i ] ) );
-	}
+	dcel = new DCEL().fromVectorList( polygon, holes );
 
-	graphics.levelMeshes.add( graphics.createWallMesh(
-		polygon[ polygon.length - 1 ], polygon[ 0 ] ) );
-
-	dcel = new DCEL().fromVectorList( polygon );
-
-	var floorMesh = graphics.createPolygonMesh(
-		dcel, graphics.floorMaterial );
-	graphics.levelMeshes.add( floorMesh );
+	graphics.levelMeshes.add( graphics.createLevelMeshes( dcel ) );
 }
 
 function placePictures()
@@ -258,18 +251,18 @@ function placePictures()
 	}
 }
 
+function toVectorArray( level )
+{
+	var res = new Array( level.length );
+	for( var i = 0; i < level.length; ++i )
+	{
+		res[ i ] = new THREE.Vector2( level[ i ][ 0 ], level[ i ][ 1 ] );
+	}
+	return res;
+}
+
 function loadLevel( level )
 {
-	function toVectorArray( level )
-	{
-		var res = new Array( level.length );
-		for( var i = 0; i < level.length; ++i )
-		{
-			res[ i ] = new THREE.Vector2( level[ i ][ 0 ], level[ i ][ 1 ] );
-		}
-		return res;
-	}
-
 	GameState.set( GameStates.LevelLoading );
 
 	selectedGuardType = null;
@@ -412,7 +405,7 @@ function onDragStop()
 			var p = graphics.screenToWorldPosition( Dragging.last );
 			if( p === null ) { return; }
 
-			if( dcel.faces[ 0 ].contains( p ) )
+			if( dcel.isPointInFace( p, dcel.faces[ 0 ] ) )
 			{
 				moveGuard( pickedGuard, p );
 				checkCompletion();
@@ -493,7 +486,7 @@ function onMouseUp( event )
 				var p = graphics.screenToWorldPosition( coord );
 				if( p === null ) { return; }
 
-				if( dcel.faces[ 0 ].contains( p ) )
+				if( dcel.isPointInFace( p, dcel.faces[ 0 ] ) )
 				{
 					addGuard( p );
 					checkCompletion();
@@ -508,7 +501,7 @@ function onMouseUp( event )
 		else
 		{
 			var p = graphics.screenToWorldPosition( coord );
-			if( p !== null && dcel.faces[ 0 ].contains( p ) )
+			if( p !== null && dcel.isPointInFace( p, dcel.faces[ 0 ] ) )
 			{
 				graphics.fxView.camera.position.x = p.x;
 				graphics.fxView.camera.position.y = p.y;

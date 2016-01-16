@@ -9,10 +9,13 @@ PICTUREOFFSETMAX: 150,
 
 geometryFinished: false,
 picturesFinished: false,
+faces: new Array(),
 points: new Array(),
 dcel: null,
+pillarMesh: null,
 pictures: new Array(),
 pictureMeshes: new Array(),
+levelMeshes: null,
 helperMesh: null,
 mouseUpHandler: null,
 mouseMoveHandler: null,
@@ -59,6 +62,10 @@ Picture: function( id, edge, start, end )
 
 init: function()
 {
+	this.faces.push( this.points );
+
+	this.levelMeshes = new THREE.Object3D();
+
 	this.currentPictureSize = LevelEditor.MIN_PICTURE_SIZE;
 
 	this.helperMesh = new THREE.Mesh(
@@ -67,6 +74,9 @@ init: function()
 	this.helperMesh.scale.set(
 		this.currentPictureSize, this.currentPictureSize, 1 );
 	this.helperMesh.visible = false;
+
+	this.pillarMesh = graphics.createPillarMesh( new THREE.Vector3() );
+	this.pillarMesh.visible = false;
 
 	this.mouseUpHandler = this.onMouseUp.bind( this );
 	this.mouseMoveHandler = this.onMouseMove.bind( this );
@@ -94,11 +104,11 @@ init: function()
 	{
 		this.normalizeGeometry();
 
-		graphics.clearLevelMeshes();
-		graphics.levelMeshes.add( this.helperMesh );
+		graphics.levelMeshes.remove( this.levelMeshes );
+		this.levelMeshes = new THREE.Object3D();
+		graphics.levelMeshes.add( this.levelMeshes );
 
 		this.addGeometryMeshes();
-		this.finalizeGeometryState();
 		this.repositionPictureMeshes();
 
 		UI.disable( this.UI.normalize );
@@ -132,8 +142,9 @@ reset: function( initial )
 {
 	if( initial === undefined || !initial )
 	{
-		graphics.clearLevelMeshes();
-		graphics.levelMeshes.add( this.helperMesh );
+		graphics.levelMeshes.remove( this.levelMeshes );
+		this.levelMeshes = new THREE.Object3D();
+		graphics.levelMeshes.add( this.levelMeshes );
 
 		graphics.overview.reset();
 
@@ -145,12 +156,15 @@ reset: function( initial )
 
 	this.geometryFinished = false;
 	this.picturesFinished = false;
+	this.faces.length = 1;
+	this.faces[ 0 ] = this.points;
 	this.points.length = 0;
 	this.dcel = null;
 	this.pictures.length = 0;
 	this.pictureMeshes.length = 0;
 
 	this.helperMesh.visible = false;
+	this.pillarMesh.visible = false;
 
 	UI.setText( this.UI.title, "Construct level geometry" );
 
@@ -172,7 +186,9 @@ reset: function( initial )
 
 onLoad: function()
 {
+	graphics.levelMeshes.add( this.levelMeshes );
 	graphics.levelMeshes.add( this.helperMesh );
+	graphics.levelMeshes.add( this.pillarMesh );
 
 	graphics.overview.activate();
 	Dragging.onstart = this.onDragStart.bind( this );
@@ -191,7 +207,9 @@ onExit: function()
 {
 	this.reset();
 
+	graphics.levelMeshes.remove( this.levelMeshes );
 	graphics.levelMeshes.remove( this.helperMesh );
+	graphics.levelMeshes.remove( this.pillarMesh );
 
 	graphics.overview.deactivate();
 	Dragging.onstart = null;
@@ -222,7 +240,8 @@ onMouseUp: function( event )
 		if( this.points.length > 0 &&
 			p.distanceTo( this.points[ 0 ] ) < this.SNAP_THRESHOLD )
 		{
-			this.finalizeGeometry();
+			this.finalizeFace();
+			this.startFace();
 			return;
 		}
 
@@ -230,12 +249,14 @@ onMouseUp: function( event )
 
 		if( this.points.length > 1 )
 		{
-			graphics.levelMeshes.add( graphics.createWallMesh(
+			this.levelMeshes.add( graphics.createWallMesh(
 				this.points[ this.points.length - 2 ], p ) );
 		}
 		else
 		{
-			graphics.levelMeshes.add( graphics.createPillarMesh( p ) );
+			this.pillarMesh.position.x = p.x;
+			this.pillarMesh.position.y = p.y;
+			this.pillarMesh.visible = true;
 		}
 	}
 	else if( !this.picturesFinished && this.currentPicturePreview !== null )
@@ -274,36 +295,70 @@ importGeometry: function( svg )
 	if( points !== null )
 	{
 		this.points = points;
+		this.faces[ 0 ] = this.points;
 
-		this.addGeometryMeshes();
+		this.startFace();
 
 		this.finalizeGeometryState();
+
+		this.addGeometryMeshes();
 	}
+},
+
+startFace: function()
+{
+	this.points = new Array();
+	this.faces.push( this.points );
+},
+
+removeEmptyFace: function()
+{
+	if( this.faces.length > 1 && this.points.length === 0 )
+	{
+		this.faces.pop();
+		this.points = this.faces[ this.faces.length - 1 ];
+	}
+},
+
+finalizeFace: function()
+{
+	this.removeEmptyFace();
+
+	if( this.points.length > 2 )
+	{
+		if( this.pillarMesh.visible )
+		{
+			this.pillarMesh.visible = false;
+		}
+
+		this.levelMeshes.add( graphics.createWallMesh(
+			this.points[ this.points.length - 1 ], this.points[ 0 ] ) );
+		return true;
+	}
+	return false;
 },
 
 finalizeGeometry: function()
 {
-	graphics.levelMeshes.remove( graphics.levelMeshes.children[ 1 ] );
-	graphics.levelMeshes.add( graphics.createWallMesh(
-		this.points[ this.points.length - 1 ], this.points[ 0 ] ) );
+	if( !this.finalizeFace() )
+	{
+		return false;
+	}
 
-	this.dcel = new DCEL().fromVectorList( this.points );
+	var holes = this.faces.slice( 1 );
 
-	graphics.levelMeshes.add(
-		graphics.createPolygonMesh( this.dcel, graphics.floorMaterial ) );
+	this.dcel = new DCEL().fromVectorList( this.faces[ 0 ], holes, true );
 
-	document.addEventListener( "mousemove", this.mouseMoveHandler, false );
-	document.addEventListener( "mousewheel", this.mouseScrollHandler, false );
-
-	this.geometryFinished = true;
+	var floorMesh =
+		graphics.createPolygonMesh( this.dcel, graphics.floorMaterial );
+	this.levelMeshes.add( floorMesh );
+	return true;
 },
 
 finalizeGeometryState: function()
 {
-	if( this.points.length > 2 )
+	if( this.finalizeGeometry() )
 	{
-		this.finalizeGeometry();
-
 		UI.hide( this.UI.pickerWrapper );
 
 		UI.show( this.UI.random );
@@ -311,6 +366,11 @@ finalizeGeometryState: function()
 		UI.show( this.UI.normalize );
 
 		UI.setText( this.UI.title, "Place pictures" );
+
+		this.geometryFinished = true;
+
+		document.addEventListener( "mousemove", this.mouseMoveHandler, false );
+		document.addEventListener( "mousewheel", this.mouseScrollHandler, false );
 	}
 },
 
@@ -352,21 +412,34 @@ finalize: function()
 
 addGeometryMeshes: function()
 {
-	graphics.levelMeshes.add( graphics.createPillarMesh( this.points[ 0 ] ) );
-	for( var i = 1; i < this.points.length; ++i )
-	{
-		graphics.levelMeshes.add( graphics.createWallMesh(
-			this.points[ i - 1 ], this.points[ i ] ) );
-	}
+	this.levelMeshes.add( graphics.createLevelMeshes( this.dcel ) );
 },
 
 undoWall: function()
 {
 	if( this.points.length > 0 )
 	{
+		if( this.points.length > 1 )
+		{
+			this.levelMeshes.remove( this.levelMeshes.children[
+				this.levelMeshes.children.length - 1 ] );
+		}
+		else
+		{
+			this.pillarMesh.visible = false;
+		}
+
 		this.points.pop();
-		graphics.levelMeshes.remove( graphics.levelMeshes.children[
-			graphics.levelMeshes.children.length - 1 ] );
+	}
+	else if( this.faces.length > 1 )
+	{
+		this.removeEmptyFace();
+		this.levelMeshes.remove( this.levelMeshes.children[
+			this.levelMeshes.children.length - 1 ] );
+
+		this.pillarMesh.position.x = this.points[ 0 ].x;
+		this.pillarMesh.position.y = this.points[ 0 ].y;
+		this.pillarMesh.visible = true;
 	}
 },
 
@@ -375,7 +448,7 @@ undoPicture: function()
 	if( this.pictures.length > 0 )
 	{
 		this.pictures.pop();
-		graphics.levelMeshes.remove( this.pictureMeshes.pop() );
+		this.levelMeshes.remove( this.pictureMeshes.pop() );
 	}
 },
 
@@ -414,7 +487,8 @@ clampPossiblePicturePosition: function( edge, position, size )
 
 determinePossiblePicturePosition: function( p )
 {
-	var closestEdge = findClosestDCELEdge( this.dcel, p );
+	var closestEdge = findClosestDCELFaceEdge(
+		this.dcel, this.dcel.faces[ 0 ], p );
 	if( closestEdge.distance < LevelEditor.SNAP_THRESHOLD )
 	{
 		closestEdge.localCoordinate = this.clampPossiblePicturePosition(
@@ -530,7 +604,7 @@ addPicture: function( id, edgeIndex, start, end )
 	var mesh = graphics.createPictureMesh( id, pos, edge.normal(), size );
 
 	this.pictureMeshes.push( mesh );
-	graphics.levelMeshes.add( mesh );
+	this.levelMeshes.add( mesh );
 
 	this.pictures.push( new LevelEditor.Picture( id, edgeIndex, start, end ) );
 },
@@ -540,7 +614,7 @@ removePicture: function( picture )
 	var index = this.pictures.indexOf( picture );
 	this.pictures.splice( index, 1 );
 
-	graphics.levelMeshes.remove( this.pictureMeshes[ index ] );
+	this.levelMeshes.remove( this.pictureMeshes[ index ] );
 	this.pictureMeshes.splice( index, 1 );
 },
 
@@ -558,36 +632,50 @@ placeRandomPictures: function()
 		this.undoPicture();
 	}
 
-	var scale = 0.5 + 0.5 * Math.random();
-	var size = 0.5 * WALLHEIGHT * scale;
-
-	var edgeIndex = 0;
-	var iter = this.dcel.edges[ 0 ];
-	do
+	for( var i = 0; i < this.dcel.edges.length; ++i )
 	{
-		var wallLength = iter.length();
-		var pos = randOffset();
-
-		while( wallLength >= pos + size + LevelEditor.PICTUREOFFSETMIN )
+		var edge = this.dcel.edges[ i ];
+		if( edge.face === this.dcel.faces[ 0 ] )
 		{
-			var id =
-				Math.floor( Math.random() * graphics.pictureMaterials.length );
+			var wallLength = edge.length();
+			var size;
+			var pos;
+			if( wallLength < LevelEditor.MIN_PICTURE_SIZE +
+					2 * LevelEditor.PICTUREOFFSETMIN )
+			{
+				continue;
+			}
+			else
+			{
+				pos = randOffset();
+				if( pos + LevelEditor.MIN_PICTURE_SIZE >= wallLength )
+				{
+					pos = Math.max(
+						pos - LevelEditor.PICTUREOFFSETMIN,
+						LevelEditor.PICTUREOFFSETMIN );
+				}
+				size = Math.max( LevelEditor.MIN_PICTURE_SIZE,
+					Math.min( wallLength - pos, WALLHEIGHT ) *
+						( 0.2 + Math.random() * 0.6 ) );
+			}
 
-			this.addPicture(
-				id,
-				edgeIndex,
-				pos / wallLength,
-				( pos + size ) / wallLength );
+			while( wallLength >= pos + size + LevelEditor.PICTUREOFFSETMIN )
+			{
+				var id = Math.floor( Math.random() *
+					graphics.pictureMaterials.length );
 
-			pos += size + randOffset();
+				this.addPicture(
+					id,
+					i,
+					pos / wallLength,
+					( pos + size ) / wallLength );
 
-			scale = 0.5 + 0.5 * Math.random();
-			size = 0.5 * WALLHEIGHT * scale;
+				pos += size + randOffset();
+				size = LevelEditor.MIN_PICTURE_SIZE +
+					Math.random() * ( WALLHEIGHT - LevelEditor.MIN_PICTURE_SIZE );
+			}
 		}
-
-		iter = iter.next;
-		++edgeIndex;
-	} while( iter != this.dcel.edges[ 0 ] );
+	}
 },
 
 repositionPictureMeshes: function()
@@ -602,7 +690,7 @@ repositionPictureMeshes: function()
 
 		var mesh = graphics.createPictureMesh(
 			picture.id, pos, edge.normal(), size );
-		graphics.levelMeshes.add( mesh );
+		this.levelMeshes.add( mesh );
 
 		this.pictureMeshes[ i ] = mesh;
 	}
@@ -610,10 +698,21 @@ repositionPictureMeshes: function()
 
 createExportLink: function()
 {
-	var points = new Array( this.points.length );
-	for( var i = 0; i < this.points.length; ++i )
+	var points = new Array( this.faces[ 0 ].length );
+	for( var i = 0; i < this.faces[ 0 ].length; ++i )
 	{
-		points[ i ] = [ this.points[ i ].x, this.points[ i ].y ];
+		points[ i ] = [ this.faces[ 0 ][ i ].x, this.faces[ 0 ][ i ].y ];
+	}
+	var holes = new Array( this.faces.length - 1 );
+	for( var i = 0; i < this.faces.length - 1; ++i )
+	{
+		var face = this.faces[ i + 1 ];
+		var hole = new Array( face.length );
+		for( var j = 0; j < hole.length; ++j )
+		{
+			hole[ j ] = [ face[ j ].x, face[ j ].y ];
+		}
+		holes[ i ] = hole;
 	}
 
 	var guardTypes = new Array();
@@ -635,8 +734,9 @@ createExportLink: function()
 		parseInt( this.UI.budget.value ),
 		guardTypes,
 		points,
+		holes,
 		this.pictures,
-		1 );
+		2 );
 
 	var txt = "levels.push(" + JSON.stringify( level ) + ");";
 
@@ -741,17 +841,19 @@ parseSvg: function( svg )
 
 normalizeGeometry: function()
 {
-	if( this.points.length <= 0 ) { return; }
+	var points = this.faces[ 0 ];
+
+	if( points.length <= 0 ) { return; }
 
 	var size = this.NORMALIZATION_SIZE;
 
-	var xmin = this.points[ 0 ].x;
+	var xmin = points[ 0 ].x;
 	var xmax = xmin;
-	var ymin = this.points[ 0 ].y;
+	var ymin = points[ 0 ].y;
 	var ymax = ymin;
-	for( var i = 1; i < this.points.length; ++i )
+	for( var i = 1; i < points.length; ++i )
 	{
-		var p = this.points[ i ];
+		var p = points[ i ];
 		if( p.x < xmin )      { xmin = p.x; }
 		else if( p.x > xmax ) { xmax = p.x; }
 
@@ -764,9 +866,13 @@ normalizeGeometry: function()
 		0.5 * ( xmax + xmin ),
 		0.5 * ( ymax + ymin ) );
 
-	for( var i = 0; i < this.points.length; ++i )
+	for( var i = 0; i < this.faces.length; ++i )
 	{
-		this.points[ i ].sub( center ).multiplyScalar( scale );
+		points = this.faces[ i ];
+		for( var j = 0; j < points.length; ++j )
+		{
+			points[ j ].sub( center ).multiplyScalar( scale );
+		}
 	}
 
 	for( var i = 0; i < this.pictures.length; ++i )

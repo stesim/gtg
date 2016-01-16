@@ -19,6 +19,11 @@ function clampAngle( phi )
 	return phi;
 }
 
+function isAngleZero( alpha )
+{
+	return ( Math.abs( clampAngle( alpha ) ) < eps );
+}
+
 function vert2str( v )
 {
 	return ( "( " + v.pos.x + ", " + v.pos.y + " )" );
@@ -69,7 +74,8 @@ function isPointOnSegment( p, a, b )
 		proj > -eps && proj < ( 1 + eps ) );
 }
 
-function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
+function findClosestDCELFaceHalfLineIntersection(
+	dcel, face, a, b, excludeEdges )
 {
 	var dir = b.clone().sub( a );
 	var pvdist = dir.length();
@@ -80,7 +86,11 @@ function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
 	for( var i = 0; i < dcel.edges.length; ++i )
 	{
 		var edge = dcel.edges[ i ];
-		if( excludeEdges && excludeEdges.indexOf( edge ) >= 0 ) { continue; }
+		if( edge.face !== face ||
+			( excludeEdges && excludeEdges.indexOf( edge ) >= 0 ) )
+		{
+			continue;
+		}
 
 		var intersection = extendedLineIntersection(
 			a, b, edge.origin.pos, edge.next.origin.pos );
@@ -90,17 +100,9 @@ function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
 			  intersection[ 1 ] < closestIntersection[ 1 ] ) &&
 			intersection[ 2 ] > -eps && intersection[ 2 ] < ( 1 + eps ) &&
 			( intersection[ 1 ] >= eps ||
-			  ( intersection[ 1 ] > -eps &&
-				( edge.normal().dot( dir ) < 0 &&
-				  ( intersection[ 2 ] >= eps ||
-					edge.prev.normal().dot( dir ) < 0 ||
-					edge.origin.isConvex() ) &&
-				  ( intersection[ 2 ] <= ( 1 - eps ) ||
-					edge.next.normal().dot( dir ) < 0 ||
-					edge.next.origin.isConvex() )
-				)
-			  )
-			)
+			  ( intersection[ 1 ] > -eps && edge.normal().dot( dir ) < 0 ) ) &&
+			( intersection[ 2 ] >= eps || edge.origin.isConvex() ) &&
+			( intersection[ 2 ] <= ( 1 - eps ) || edge.next.origin.isConvex() )
 		  )
 		{
 			closestIntersection = intersection;
@@ -111,7 +113,7 @@ function findClosestDCELHalfLineIntersection( dcel, a, b, excludeEdges )
 		{ edge: intersectedEdge, intersection: closestIntersection } : null );
 }
 
-function findClosestDCELEdge( dcel, p )
+function findClosestDCELFaceEdge( dcel, face, p )
 {
 	var closestEdge = null;
 	var closestProjection = null;
@@ -119,12 +121,15 @@ function findClosestDCELEdge( dcel, p )
 	for( var i = 0; i < dcel.edges.length; ++i )
 	{
 		var edge = dcel.edges[ i ];
-		var projection = edge.pointProjection( p );
-		if( closestEdge === null ||
-			projection.distance < closestProjection.distance )
+		if( edge.face === face )
 		{
-			closestEdge = edge;
-			closestProjection = projection;
+			var projection = edge.pointProjection( p );
+			if( closestEdge === null ||
+				projection.distance < closestProjection.distance )
+			{
+				closestEdge = edge;
+				closestProjection = projection;
+			}
 		}
 	}
 

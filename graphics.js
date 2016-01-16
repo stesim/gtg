@@ -366,7 +366,23 @@ var graphics =
 
 			iter = iter.next;
 		}
-		shape.lineTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
+
+		for( var i = 1; i < dcel.faces.length; ++i )
+		{
+			var hole = new THREE.Path();
+			var start = dcel.faces[ i ].edge.twin;
+			var iter = start;
+			hole.moveTo( iter.origin.pos.x, iter.origin.pos.y );
+			iter = iter.next;
+
+			while( iter !== start )
+			{
+				hole.lineTo( iter.origin.pos.x, iter.origin.pos.y );
+				iter = iter.next;
+			}
+
+			shape.holes.push( hole );
+		}
 
 		var geom = shape.makeGeometry();
 
@@ -379,6 +395,33 @@ var graphics =
 		}
 
 		return new THREE.Mesh( geom, material );
+	},
+
+	createLevelMeshes: function( dcel )
+	{
+		var container = new THREE.Object3D();
+
+		for( var i = 0; i < dcel.faces.length; ++i )
+		{
+			var start = dcel.faces[ i ].edge;
+			if( i > 0 )
+			{
+				start = start.twin;
+			}
+			var iter = start;
+			do
+			{
+				container.add( graphics.createWallMesh(
+					iter.prev.origin.pos, iter.origin.pos ) );
+				iter = iter.next;
+			} while( iter !== start );
+		}
+
+		var floorMesh = graphics.createPolygonMesh(
+			dcel, graphics.floorMaterial );
+		container.add( floorMesh );
+
+		return container;
 	},
 
 	createGuardPreview: function( minAngle, maxAngle )

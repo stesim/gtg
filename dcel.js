@@ -5,7 +5,11 @@ function DCEL()
 	this.faces = new Array();
 }
 
-DCEL.prototype.fromVectorList = function( vectors )
+DCEL.prototype.ACCEPT = 0;
+DCEL.prototype.CCW = 1;
+DCEL.prototype.CW = 2;
+
+DCEL.prototype.simpleFromVectorList = function( vectors, order )
 {
 	function checkIfCCW( poly )
 	{
@@ -54,9 +58,14 @@ DCEL.prototype.fromVectorList = function( vectors )
 		return this;
 	}
 
-	if( !checkIfCCW( vectors ) )
+	if( order && order !== DCEL.prototype.ACCEPT )
 	{
-		vectors.reverse();
+		var isCCW = checkIfCCW( vectors );
+		if( ( order === DCEL.prototype.CCW && !isCCW ) ||
+			( order === DCEL.prototype.CW && isCCW ) )
+		{
+			vectors.reverse();
+		}
 	}
 
 	var root = new HalfEdge();
@@ -93,6 +102,43 @@ DCEL.prototype.fromVectorList = function( vectors )
 	return this;
 }
 
+DCEL.prototype.fromVectorList = function( polygon, holes, forceOrderCheck )
+{
+	this.simpleFromVectorList( polygon, order );
+
+	var order = ( forceOrderCheck ? DCEL.prototype.CW : DCEL.prototype.ACCEPT );
+
+	for( var i = 0; i < holes.length; ++i )
+	{
+		var hole = new DCEL().simpleFromVectorList( holes[ i ], order );
+		var face = hole.faces[ 0 ];
+		for( var j = 0; j < hole.edges.length; ++j )
+		{
+			var edge = hole.edges[ j ];
+			edge.face = this.faces[ 0 ];
+			edge.twin = new HalfEdge();
+
+			this.vertices.push( edge.origin );
+			this.edges.push( edge );
+		}
+		for( var j = 0; j < hole.edges.length; ++j )
+		{
+			var edge = hole.edges[ j ];
+			edge.twin.face = face;
+			edge.twin.origin = edge.next.origin;
+			edge.twin.next = edge.prev.twin;
+			edge.twin.prev = edge.next.twin;
+			edge.twin.twin = edge;
+
+			this.edges.push( edge.twin );
+		}
+		face.edge = hole.edges[ 0 ].twin;
+		this.faces.push( face );
+	}
+
+	return this;
+}
+
 DCEL.prototype.clearTemp = function()
 {
 	for( var i = 0; i < this.edges.length; ++i )
@@ -106,6 +152,26 @@ DCEL.prototype.clearTemp = function()
 	for( var i = 0; i < this.faces.length; ++i )
 	{
 		this.faces[ i ].temp = null;
+	}
+}
+
+DCEL.prototype.isPointInFace = function( point, face )
+{
+	if( !face.boundaryContains( point ) )
+	{
+		return false;
+	}
+	else
+	{
+		for( var i = 0; i < this.faces.length; ++i )
+		{
+			if( this.faces[ i ] !== face &&
+				this.faces[ i ].boundaryContains( point ) )
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 }
 
@@ -213,7 +279,7 @@ Face.prototype.area = function()
 	return ( 0.5 * A );
 }
 
-Face.prototype.contains = function( point )
+Face.prototype.boundaryContains = function( point )
 {
 	var dir = new THREE.Vector2( 0, 0 );
 	while( Math.abs( dir.x ) + Math.abs( dir.y ) < 0.1 )

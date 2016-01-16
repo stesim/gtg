@@ -10,23 +10,6 @@ function visibility( dcel, p, opt )
 		return clampAngle( Math.atan2( v.y - p.y, v.x - p.x ) - opt.direction );
 	}
 
-	function isAngleZero( alpha )
-	{
-		return ( Math.abs( clampAngle( alpha ) ) < eps );
-	}
-
-	function findCoincidingVertex( vertices, p )
-	{
-		for( var i = 0; i < vertices.length; ++i )
-		{
-			if( p.distanceTo( vertices[ i ].pos ) < eps )
-			{
-				return vertices[ i ];
-			}
-		}
-		return null;
-	}
-
 	function vertexCase( v )
 	{
 		function isOnLine( a )
@@ -42,11 +25,8 @@ function visibility( dcel, p, opt )
 			return ( a < 0 );
 		}
 
-		var vn = v.edge.next.origin.pos;
-		var vp = v.edge.prev.origin.pos;
-
-		var dn = linePointDistance( p, v.pos, vn );
-		var dp = linePointDistance( p, v.pos, vp );
+		var dn = linePointDistance( p, v.pos, v.edge.next.origin.pos );
+		var dp = linePointDistance( p, v.pos, v.edge.prev.origin.pos );
 
 		if( isOnLine( dp ) )
 		{
@@ -82,6 +62,18 @@ function visibility( dcel, p, opt )
 		{
 			return diff;
 		}
+	}
+
+	function findCoincidingVertex( vertices, p )
+	{
+		for( var i = 0; i < vertices.length; ++i )
+		{
+			if( p.distanceTo( vertices[ i ].pos ) < eps )
+			{
+				return vertices[ i ];
+			}
+		}
+		return null;
 	}
 
 	function initializeVertexList( vertices, visVectors )
@@ -124,6 +116,8 @@ function visibility( dcel, p, opt )
 	var visVectors = new Array();
 
 	var vertices = dcel.vertices.slice();
+	var face = dcel.faces[ 0 ];
+
 	var startIndex = initializeVertexList( vertices, visVectors );
 
 	var minAngleReached = ( opt.minAngle ? false : true );
@@ -156,8 +150,8 @@ function visibility( dcel, p, opt )
 			}
 			else if( alpha > opt.minAngle )
 			{
-				var intersection = findClosestDCELHalfLineIntersection(
-					dcel, p, new THREE.Vector2(
+				var intersection = findClosestDCELFaceHalfLineIntersection(
+					dcel, face, p, new THREE.Vector2(
 						Math.cos( opt.direction + opt.minAngle ),
 						Math.sin( opt.direction + opt.minAngle ) ).add( p ) );
 				intersection = intersection.intersection[ 0 ];
@@ -184,8 +178,8 @@ function visibility( dcel, p, opt )
 			}
 			else if( alpha > opt.maxAngle )
 			{
-				var intersection = findClosestDCELHalfLineIntersection(
-					dcel, p, new THREE.Vector2(
+				var intersection = findClosestDCELFaceHalfLineIntersection(
+					dcel, face, p, new THREE.Vector2(
 						Math.cos( opt.direction + opt.maxAngle ),
 						Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
 				intersection = intersection.intersection[ 0 ];
@@ -200,8 +194,8 @@ function visibility( dcel, p, opt )
 			}
 		}
 
-		var intersection = findClosestDCELHalfLineIntersection(
-			dcel, p, vertex.pos, [ vertex.edge, vertex.edge.prev ] );
+		var intersection = findClosestDCELFaceHalfLineIntersection(
+			dcel, face, p, vertex.pos, [ vertex.edge, vertex.edge.prev ] );
 		if( intersection !== null )
 		{
 			intersection = intersection.intersection[ 0 ];
@@ -259,8 +253,8 @@ function visibility( dcel, p, opt )
 
 	if( opt.maxAngle && minAngleReached && !maxAngleReached )
 	{
-		var intersection = findClosestDCELHalfLineIntersection(
-			dcel, p, new THREE.Vector2(
+		var intersection = findClosestDCELFaceHalfLineIntersection(
+			dcel, face, p, new THREE.Vector2(
 				Math.cos( opt.direction + opt.maxAngle ),
 				Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
 		intersection = intersection.intersection[ 0 ];
@@ -271,5 +265,5 @@ function visibility( dcel, p, opt )
 		}
 	}
 
-	return new DCEL().fromVectorList( visVectors );
+	return new DCEL().simpleFromVectorList( visVectors, true );
 }

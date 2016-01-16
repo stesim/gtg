@@ -62,7 +62,7 @@ function Guard( type, position, polygon )
 {
 	this.type = type;
 	this.position = position;
-	this.direction = 0.5 * Math.PI;
+	this.direction = 0;//0.5 * Math.PI;
 	this.polygon = null;
 	this.cameraMesh = null;
 	this.visibilityMesh = null;
@@ -93,6 +93,47 @@ Guard.prototype.move = function( position, polygon )
 	this.position = position;
 
 	this.guardMesh.position.set( position.x, position.y, 0 );
+
+	// TODO: TEMP
+//	var inner = polygon.faces[ 0 ];
+//	var v = [
+//		new Vertex( new HalfEdge(), new THREE.Vector2(  50,  50 ) ),
+//		new Vertex( new HalfEdge(), new THREE.Vector2(  50, -50 ) ),
+//		new Vertex( new HalfEdge(), new THREE.Vector2( -50, -50 ) ),
+//		new Vertex( new HalfEdge(), new THREE.Vector2( -50,  50 ) )
+//	];
+//	var hole = new Face( null );
+//	polygon.faces.push( hole );
+//	for( var i = 0; i < v.length; ++i )
+//	{
+//		var next = v[ ( i + 1 ) % v.length ];
+//		var prev = v[ ( i - 1 + v.length ) % v.length ];
+//
+//		v[ i ].edge.origin = v[ i ];
+//		v[ i ].edge.next = next.edge;
+//		v[ i ].edge.prev = prev.edge;
+//		v[ i ].edge.face = inner;
+//
+//		polygon.vertices.push( v[ i ] );
+//		polygon.edges.push( v[ i ].edge );
+//
+//		v[ i ].edge.twin = new HalfEdge();
+//	}
+//	for( var i = 0; i < v.length; ++i )
+//	{
+//		var next = v[ ( i + 1 ) % v.length ];
+//		var prev = v[ ( i - 1 + v.length ) % v.length ];
+//
+//		v[ i ].edge.twin.origin = next;
+//		v[ i ].edge.twin.next = prev.edge.twin;
+//		v[ i ].edge.twin.prev = next.edge.twin;
+//		v[ i ].edge.twin.face = hole;
+//		v[ i ].edge.twin.twin = v[ i ].edge;
+//
+//		polygon.edges.push( v[ i ].edge.twin );
+//	}
+//	hole.edge = v[ 0 ].edge.twin;
+	//
 
 	this.polygon = this.type.visibility( polygon, this );
 
