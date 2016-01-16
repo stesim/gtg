@@ -24,14 +24,57 @@ var ui =
 			{
 				ui.hint.display( "Versus Mode is not available yet.", 5 );
 			} ).position( { top: 40, left: 0 } ).show().disable() );
+		
+		ui.mainMenu.add( new UI.Button( "Developer",
+			function()
+			{
+				ui.mainMenu.hide();
+				ui.developerMenu.show();
+
+				GameStates.Menu.lastVisible = ui.developerMenu;
+			} ).position( { top: 120, left: 0 } ).show() );
 
 		ui.mainMenu.show();
-		
-		ui.mainMenu.add( new UI.Button( "Level Creation",
+
+		ui.developerMenu = new UI.Group()
+			.position( { top: 200, left: 100 } )
+			.size( 125, 200 )
+			.cssClass( "verticalMenu" );
+
+		ui.developerMenu.add( new UI.Button( "Level Editor",
 			function()
 			{
 				GameState.set( GameStates.LevelEditing );
-			} ).position( { top: 80, left: 0 } ).show() );
+			} ).position( { top: 0, left: 0 } ).show() );
+
+		ui.developerMenu.add( new UI.Text( "Load local level:" )
+			.position( { top: 60, left: 0 } ).show() );
+
+		ui.developerMenu.levelPicker = new UI.FilePicker( ".js",
+			function( event )
+			{
+				var reader = new FileReader();
+				reader.onload = function()
+				{
+					var elem = document.createElement( "script" );
+					elem.setAttribute( "type", "text/javascript" );
+					elem.innerHTML = reader.result;
+					document.head.appendChild( elem );
+
+					var level = levels.pop();
+					loadLevel( level );
+				}
+				reader.readAsText( event.target.files[ 0 ] );
+			}, ui.developerMenu ).position( { top: 85, left: 0 } ).show();
+
+		ui.developerMenu.add( new UI.Button( "BACK",
+			function()
+			{
+				ui.developerMenu.hide();
+				ui.mainMenu.show();
+
+				GameStates.Menu.lastVisible = ui.mainMenu;
+			} ).position( { top: 180, left: 0 } ).show() );
 
 		ui.storyMenu = new UI.Group()
 			.position( { top: 200, left: 100 } )
@@ -41,7 +84,7 @@ var ui =
 		ui.storyMenu.add( new UI.Button( "Continue",
 			function()
 			{
-				loadLevel( 0 );
+				loadLevel( levels[ 0 ] );
 			} ).position( { top: 0, left: 0 } ).show() );
 
 		ui.storyMenu.add( new UI.Button( "Select Level",
@@ -52,6 +95,7 @@ var ui =
 
 				GameStates.Menu.lastVisible = ui.levelsMenu;
 			} ).position( { top: 40, left: 0 } ).show() );
+
 		ui.storyMenu.add( new UI.Button( "BACK",
 			function()
 			{
@@ -69,7 +113,7 @@ var ui =
 		var levelOnclick =
 			function( i )
 			{
-				loadLevel( i );
+				loadLevel( levels[ i ] );
 			};
 		for( var i = 0; i < levels.length; ++i )
 		{
@@ -98,7 +142,11 @@ var ui =
 		ui.ingameMenu.nextButton = new UI.Button( "Next",
 			function()
 			{
-				loadLevel( levels.indexOf( currentLevel ) + 1 );
+				var currentIndex = levels.indexOf( currentLevel );
+				if( currentIndex >= 0 )
+				{
+					loadLevel( levels[ currentIndex + 1 ] );
+				}
 			}, ui.ingameMenu ).position( { top: 0, left: 135 } );
 
 		ui.ingameMenu.overviewButton = new UI.Button( "Overview",

@@ -274,7 +274,7 @@ function loadLevel( level )
 
 	graphics.overview.activate();
 
-	currentLevel = levels[ level ];
+	currentLevel = level;
 
 	loadLevelGeometry();
 	placePictures();

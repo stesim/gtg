@@ -42,18 +42,19 @@ var GameStates =
 
 			graphics.disableRendering();
 
-			ui.storyMenu.visible( GameStates.Menu.lastVisible === ui.storyMenu );
-			ui.levelsMenu.visible( GameStates.Menu.lastVisible === ui.levelsMenu );
-			ui.mainMenu.visible( GameStates.Menu.lastVisible === ui.mainMenu );
+			GameStates.Menu.lastVisible.show();
 
 			ui.titleText.show();
 		},
 		function()
 		{
 			ui.titleText.hide();
-			ui.mainMenu.hide();
-			ui.storyMenu.hide();
-			ui.levelsMenu.hide();
+
+			GameStates.Menu.lastVisible.hide();
+			if( GameStates.Menu.lastVisible === ui.developerMenu )
+			{
+				ui.developerMenu.levelPicker.elem.value = null;
+			}
 
 			graphics.enableRendering();
 		} ),
@@ -114,7 +115,8 @@ var GameStates =
 		function()
 		{
 			ui.completionText.show();
-			if( levels.indexOf( currentLevel ) < levels.length - 1 )
+			var levelIndex = levels.indexOf( currentLevel );
+			if( levelIndex >= 0 && levelIndex < levels.length - 1 )
 			{
 				ui.ingameMenu.nextButton.show();
 			}
