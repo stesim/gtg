@@ -114,7 +114,45 @@ var GameStates =
 		"LevelCompleted",
 		function()
 		{
-			ui.completionText.show();
+			//ui.completionText.show();
+			var opacity = 0.2;
+			var spentBudget = currentLevel.budget - currentBudget;
+			if( !currentLevel.requiredBudget )
+			{
+				UI.get( "completed-star2" ).style.opacity = null;
+				UI.get( "completed-star3" ).style.opacity = null;
+				UI.hide( UI.get( "completed-star4" ) );
+			}
+			else if( spentBudget < currentLevel.requiredBudget )
+			{
+				UI.get( "completed-star2" ).style.opacity = null;
+				UI.get( "completed-star3" ).style.opacity = null;
+				UI.show( UI.get( "completed-star4" ) );
+			}
+			else if( spentBudget ===  currentLevel.requiredBudget ||
+				currentLevel.requiredBuget === currentLevel.budget )
+			{
+				UI.get( "completed-star2" ).style.opacity = null;
+				UI.get( "completed-star3" ).style.opacity = null;
+				UI.hide( UI.get( "completed-star4" ) );
+			}
+			else if( spentBudget > currentLevel.requiredBudget &&
+				spentBudget < currentLevel.budget )
+			{
+				UI.get( "completed-star2" ).style.opacity = null;
+				UI.get( "completed-star3" ).style.opacity = opacity;
+				UI.hide( UI.get( "completed-star4" ) );
+			}
+			else
+			{
+				UI.get( "completed-star2" ).style.opacity = opacity;
+				UI.get( "completed-star3" ).style.opacity = opacity;
+				UI.hide( UI.get( "completed-star4" ) );
+			}
+
+			UI.show( UI.get( "level-completed" ) );
+			ui.ingameMenu.retryButton.show();
+
 			var levelIndex = levels.indexOf( currentLevel );
 			if( levelIndex >= 0 && levelIndex < levels.length - 1 )
 			{
@@ -123,8 +161,10 @@ var GameStates =
 		},
 		function()
 		{
-			ui.completionText.hide();
+			//ui.completionText.hide();
+			UI.hide( UI.get( "level-completed" ) );
 			ui.ingameMenu.nextButton.hide();
+			ui.ingameMenu.retryButton.hide();
 			ui.ingameMenu.hide();
 			ui.levelDetails.hide();
 			ui.guardDetails.hide();

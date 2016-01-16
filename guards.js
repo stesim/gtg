@@ -62,7 +62,7 @@ function Guard( type, position, polygon )
 {
 	this.type = type;
 	this.position = position;
-	this.direction = 0;//0.5 * Math.PI;
+	this.direction = 0.5 * Math.PI;
 	this.polygon = null;
 	this.cameraMesh = null;
 	this.visibilityMesh = null;

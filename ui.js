@@ -32,6 +32,18 @@ hide: function( elem )
 	elem.style.display = "none";
 },
 
+setVisibility: function( elem, visible )
+{
+	if( visible )
+	{
+		UI.show( elem );
+	}
+	else
+	{
+		UI.hide( elem );
+	}
+},
+
 enable: function( elem )
 {
 	elem.disabled = false;
