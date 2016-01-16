@@ -173,7 +173,7 @@ var ui =
 		ui.levelDetails.description =
 			new UI.Text( "", ui.levelDetails )
 			.position( { top: 50, left: 0 } )
-			.size( 1, 0, true ).show();
+			.size( 1, 0, true ).cssClass( "justified" ).show();
 
 		ui.guardDetails = new UI.Group()
 			.position( { top: 0.25, right: 0.01 }, true )
