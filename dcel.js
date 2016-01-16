@@ -104,9 +104,12 @@ DCEL.prototype.simpleFromVectorList = function( vectors, order )
 
 DCEL.prototype.fromVectorList = function( polygon, holes, forceOrderCheck )
 {
+	var order = ( forceOrderCheck ?
+		DCEL.prototype.CCW : DCEL.prototype.ACCEPT );
+
 	this.simpleFromVectorList( polygon, order );
 
-	var order = ( forceOrderCheck ? DCEL.prototype.CW : DCEL.prototype.ACCEPT );
+	order = ( forceOrderCheck ? DCEL.prototype.CW : DCEL.prototype.ACCEPT );
 
 	for( var i = 0; i < holes.length; ++i )
 	{

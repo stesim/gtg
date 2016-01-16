@@ -43,6 +43,7 @@ UI:
 	name:            UI.get( "editor-name" ),
 	description:     UI.get( "editor-description" ),
 	budget:          UI.get( "editor-budget" ),
+	minimal:         UI.get( "editor-minimal" ),
 	guardTypes:      UI.get( "editor-guardtypes" ),
 	guardQuantities: [],
 	accept:          UI.get( "editor-accept" ),
@@ -290,13 +291,11 @@ importGeometry: function( svg )
 {
 	this.reset();
 
-	var points = this.parseSvg( svg );
+	var faces = this.parseSvg( svg );
 
-	if( points !== null )
+	if( faces !== null )
 	{
-		this.points = points;
-		this.faces[ 0 ] = this.points;
-
+		this.faces = faces;
 		this.startFace();
 
 		this.finalizeGeometryState();
@@ -322,8 +321,6 @@ removeEmptyFace: function()
 
 finalizeFace: function()
 {
-	this.removeEmptyFace();
-
 	if( this.points.length > 2 )
 	{
 		if( this.pillarMesh.visible )
@@ -333,6 +330,11 @@ finalizeFace: function()
 
 		this.levelMeshes.add( graphics.createWallMesh(
 			this.points[ this.points.length - 1 ], this.points[ 0 ] ) );
+		return true;
+	}
+	else if( this.faces.length > 1 )
+	{
+		this.removeEmptyFace();
 		return true;
 	}
 	return false;
@@ -732,11 +734,12 @@ createExportLink: function()
 		this.UI.name.value,
 		this.UI.description.value,
 		parseInt( this.UI.budget.value ),
+		parseInt( this.UI.minimal.value ),
 		guardTypes,
 		points,
 		holes,
 		this.pictures,
-		2 );
+		3 );
 
 	var txt = "levels.push(" + JSON.stringify( level ) + ");";
 
@@ -752,6 +755,7 @@ acceptProperties: function()
 	UI.disable( this.UI.name );
 	UI.disable( this.UI.description );
 	UI.disable( this.UI.budget );
+	UI.disable( this.UI.minimal );
 	for( var i = 0; i < this.UI.guardQuantities.length; ++i )
 	{
 		UI.disable( this.UI.guardQuantities[ i ] );
@@ -769,10 +773,12 @@ resetProperties: function()
 	this.UI.name.value = "";
 	this.UI.description.value = "";
 	this.UI.budget.value = 0;
+	this.UI.minimal.value = 0;
 
 	UI.enable( this.UI.name );
 	UI.enable( this.UI.description );
 	UI.enable( this.UI.budget );
+	UI.enable( this.UI.minimal );
 	for( var i = 0; i < this.UI.guardQuantities.length; ++i )
 	{
 		this.UI.guardQuantities[ i ].value = 0;
@@ -791,52 +797,68 @@ parseSvg: function( svg )
 	{
 		return null;
 	}
-	var segments = pathElems[ 0 ].pathSegList;
-	var length = pathElems[ 0 ].pathSegList.numberOfItems;
-	if( length <= 0 )
-	{
-		return null;
-	}
 
-	var points = new Array();
-	var seg = segments.getItem( 0 );
-	if( seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_ABS ||
-	    seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_REL )
+	var faces = new Array();
+	for( var j = 0; j < pathElems.length; ++j )
 	{
-		points.push( new THREE.Vector2( seg.x, -seg.y ) );
-	}
-	else
-	{
-		return null;
-	}
+		var segments = pathElems[ j ].pathSegList;
+		var length = segments.numberOfItems;
+		if( length <= 0 ) { continue; }
 
-	for( var i = 1; i < length; ++i )
-	{
-		var seg = segments.getItem( i );
-		switch( seg.pathSegType )
+		var points = new Array();
+		var seg = segments.getItem( 0 );
+		if( seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_ABS ||
+			seg.pathSegType == SVGPathSeg.PATHSEG_MOVETO_REL )
 		{
-			case SVGPathSeg.PATHSEG_LINETO_ABS:
-			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_ABS:
-				points.push( new THREE.Vector2( seg.x, -seg.y ) );
-				break;
-			case SVGPathSeg.PATHSEG_LINETO_REL:
-			case SVGPathSeg.PATHSEG_CURVETO_CUBIC_REL:
-				points.push(
-					new THREE.Vector2( seg.x, -seg.y )
-					.add( points[ points.length - 1 ] ) );
-				break;
-			case SVGPathSeg.PATHSEG_CLOSEPATH:
-				if( i < length - 1 )
-				{
-					return null;
-				}
-				break;
-			default:
-				return null;
+			points.push( new THREE.Vector2( seg.x, -seg.y ) );
+		}
+		else
+		{
+			continue;
+		}
+
+		var error = false;
+		for( var i = 1; i < length; ++i )
+		{
+			var seg = segments.getItem( i );
+			switch( seg.pathSegType )
+			{
+				case SVGPathSeg.PATHSEG_LINETO_ABS:
+				case SVGPathSeg.PATHSEG_CURVETO_CUBIC_ABS:
+					points.push( new THREE.Vector2( seg.x, -seg.y ) );
+					break;
+				case SVGPathSeg.PATHSEG_LINETO_REL:
+				case SVGPathSeg.PATHSEG_CURVETO_CUBIC_REL:
+					points.push(
+						new THREE.Vector2( seg.x, -seg.y )
+						.add( points[ points.length - 1 ] ) );
+					break;
+				case SVGPathSeg.PATHSEG_CLOSEPATH:
+					if( i < length - 1 )
+					{
+						error = true;
+					}
+					break;
+				default:
+					error = true;
+			}
+		}
+
+		if( !error )
+		{
+			if( segments[ j ].id === "0" )
+			{
+				faces.push( points );
+			}
+			else
+			{
+				faces.push( faces[ 0 ] );
+				faces[ 0 ] = points;
+			}
 		}
 	}
 
-	return points;
+	return faces;
 },
 
 normalizeGeometry: function()
