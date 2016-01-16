@@ -101,8 +101,12 @@ function findClosestDCELFaceHalfLineIntersection(
 			intersection[ 2 ] > -eps && intersection[ 2 ] < ( 1 + eps ) &&
 			( intersection[ 1 ] >= eps ||
 			  ( intersection[ 1 ] > -eps && edge.normal().dot( dir ) < 0 ) ) &&
-			( intersection[ 2 ] >= eps || edge.origin.isConvex() ) &&
-			( intersection[ 2 ] <= ( 1 - eps ) || edge.next.origin.isConvex() )
+			( intersection[ 2 ] >= eps ||
+			  edge.prev.normal().dot( dir ) < 0 ||
+			  edge.origin.isConvex() ) &&
+			( intersection[ 2 ] <= ( 1 - eps ) ||
+			  edge.next.normal().dot( dir ) < 0 ||
+			  edge.next.origin.isConvex() )
 		  )
 		{
 			closestIntersection = intersection;
