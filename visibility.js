@@ -126,11 +126,13 @@ function visibility( dcel, p, opt )
 	{
 		if( maxAngleReached ) { break; }
 
-		var vertex = vertices[ ( i + startIndex ) % vertices.length ];
+		var idx = ( i + startIndex ) % vertices.length;
+
+		var vertex = vertices[ idx ];
 		var alpha = angle( vertex.pos );
 
 		var numCollinear = 0;
-		for( var j = i + 1; j < vertices.length; ++j )
+		for( var j = idx + 1; j < vertices.length; ++j )
 		{
 			if( isAngleZero( angle( vertices[ j ].pos ) - alpha ) )
 			{
@@ -214,16 +216,16 @@ function visibility( dcel, p, opt )
 			else
 			{
 				var stopVertex = null;
-				for( var j = 1; j < numCollinear; ++j )
+				for( var j = 0; j < numCollinear; ++j )
 				{
-					var idx = ( ( i + j + startIndex ) % vertices.length );
-					if( p.distanceToSquared( vertices[ idx ].pos ) - distInterSq >= eps )
+					var idxj = idx + 1 + j; //( ( idx + j ) % vertices.length );
+					if( p.distanceToSquared( vertices[ idxj ].pos ) - distInterSq >= eps )
 					{
 						break;
 					}
-					else if( vertexCase( vertices[ idx ] ) !== c )
+					else if( vertexCase( vertices[ idxj ] ) !== c )
 					{
-						stopVertex = vertices[ idx ];
+						stopVertex = vertices[ idxj ];
 						break;
 					}
 				}
