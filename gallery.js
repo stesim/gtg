@@ -1,6 +1,7 @@
 var WALLHEIGHT = 100;
 var WALLWIDTH = 10;
 var PILLARHEIGHT = 103;
+var VISIBILITY_THRESHOLD = 2;
 
 var ZAXIS = new THREE.Vector3( 0, 0, 1 );
 
@@ -551,10 +552,15 @@ function switchToFirstPerson( guard )
 
 	graphics.lookDirArrow.visible = true;
 
+	graphics.hideVisibilityInFxView = true;
 	if( guard.visibilityMesh !== null )
 	{
 		guard.visibilityMesh.visible = false;
 	}
+
+	guard.type.previewMesh.rotation.set( 0, 0.5 * Math.PI, 0 );
+	guard.type.previewMesh.material = graphics.visibilityMaterial;
+	guard.guardMesh.add( guard.type.previewMesh );
 
 	if( guard.type.enterFirstPerson )
 	{
@@ -577,6 +583,10 @@ function switchToOverview()
 
 	graphics.lookDirArrow.visible = false;
 
+	graphics.hideVisibilityInFxView = false;
+
+	guard.guardMesh.remove( guard.type.previewMesh );
+
 	graphics.fxView.camera.remove( guard.guardMesh );
 	moveGuard( firstPersonGuard,
 		new THREE.Vector2(
@@ -594,8 +604,6 @@ function switchToOverview()
 
 function isPictureOnEdge( picture, edge )
 {
-	var eps = 0.01;
-
 	function isPointOnSegment( p, a, b )
 	{
 		var line = b.clone().sub( a );
@@ -610,8 +618,7 @@ function isPictureOnEdge( picture, edge )
 	var intersection = extendedLineIntersection(
 		start, end, edge.origin.pos, edge.next.origin.pos );
 
-	return ( intersection === null &&
-		Math.abs( edge.pointDistance( start ) ) < eps &&
+	return ( Math.abs( edge.pointDistance( start ) ) < VISIBILITY_THRESHOLD &&
 		( isPointOnSegment( start, edge.origin.pos, edge.next.origin.pos ) ||
 		  isPointOnSegment( end,   edge.origin.pos, edge.next.origin.pos ) ||
 		  isPointOnSegment( edge.origin.pos,      start, end ) ||

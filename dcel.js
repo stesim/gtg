@@ -150,8 +150,6 @@ function Face( e )
 
 Face.prototype.insertDiagonal = function( v1, v2 )
 {
-	console.log( "inserting diagonal..." );
-
 	var e1 = v1.findEdgeOnFace( this );
 	var e2 = v2.findEdgeOnFace( this );
 

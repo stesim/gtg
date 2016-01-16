@@ -126,12 +126,12 @@ function visibility( dcel, p, opt )
 	var vertices = dcel.vertices.slice();
 	var startIndex = initializeVertexList( vertices, visVectors );
 
-	console.log( vert2str( vertices[ startIndex ] ) + " (" + angle( vertices[ startIndex ].pos ) + ")" );
-
 	var minAngleReached = ( opt.minAngle ? false : true );
-	var maxAngleReached = ( opt.maxAngle ? false : true );
+	var maxAngleReached = false;
 	for( var i = 0; i < vertices.length; ++i )
 	{
+		if( maxAngleReached ) { break; }
+
 		var vertex = vertices[ ( i + startIndex ) % vertices.length ];
 		var alpha = angle( vertex.pos );
 
@@ -176,21 +176,28 @@ function visibility( dcel, p, opt )
 			}
 		}
 
-		if( opt.maxAngle && alpha - opt.maxAngle >= eps )
+		if( opt.maxAngle )
 		{
-			var intersection = findClosestDCELHalfLineIntersection(
-				dcel, p, new THREE.Vector2(
-					Math.cos( opt.direction + opt.maxAngle ),
-					Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
-			intersection = intersection.intersection[ 0 ];
-
-			if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
+			if( isAngleZero( alpha - opt.maxAngle ) )
 			{
-				visVectors.push( intersection );
+				maxAngleReached = true;
 			}
+			else if( alpha > opt.maxAngle )
+			{
+				var intersection = findClosestDCELHalfLineIntersection(
+					dcel, p, new THREE.Vector2(
+						Math.cos( opt.direction + opt.maxAngle ),
+						Math.sin( opt.direction + opt.maxAngle ) ).add( p ) );
+				intersection = intersection.intersection[ 0 ];
 
-			maxAngleReached = true;
-			break;
+				if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
+				{
+					visVectors.push( intersection );
+				}
+
+				maxAngleReached = true;
+				break;
+			}
 		}
 
 		var intersection = findClosestDCELHalfLineIntersection(
@@ -216,7 +223,7 @@ function visibility( dcel, p, opt )
 				for( var j = 1; j < numCollinear; ++j )
 				{
 					var idx = ( ( i + j + startIndex ) % vertices.length );
-					if( p.distanceToSquared( vertices[ idx ].pos ) - distInterSq > eps ) // TODO: swap cases, so "if ... < eps"
+					if( p.distanceToSquared( vertices[ idx ].pos ) - distInterSq >= eps )
 					{
 						break;
 					}
@@ -250,7 +257,7 @@ function visibility( dcel, p, opt )
 		i += numCollinear;
 	}
 
-	if( minAngleReached && !maxAngleReached )
+	if( opt.maxAngle && minAngleReached && !maxAngleReached )
 	{
 		var intersection = findClosestDCELHalfLineIntersection(
 			dcel, p, new THREE.Vector2(
@@ -263,8 +270,6 @@ function visibility( dcel, p, opt )
 			visVectors.push( intersection );
 		}
 	}
-
-	console.log( visVectors );
 
 	return new DCEL().fromVectorList( visVectors );
 }

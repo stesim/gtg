@@ -62,6 +62,9 @@ var graphics =
 	pictureMaterials: new Array(),
 	lookDirArrow: null,
 	levelMeshes: null,
+	visibilityMeshes: null,
+	hideVisibilityInFxView: false,
+	topViewMeshes: null,
 
 	init: function( updateFunc )
 	{
@@ -126,6 +129,12 @@ var graphics =
 		graphics.levelMeshes = new THREE.Object3D();
 		graphics.scene.add( graphics.levelMeshes );
 
+		graphics.visibilityMeshes = new THREE.Object3D();
+		graphics.scene.add( graphics.visibilityMeshes );
+
+		graphics.topViewMeshes = new THREE.Object3D();
+		graphics.scene.add( graphics.topViewMeshes );
+
 		graphics.visibilityMaterial = new THREE.MeshBasicMaterial(
 			{ vertexColors: THREE.FaceColors } );
 		graphics.visibilityMaterial.transparent = true;
@@ -185,9 +194,16 @@ var graphics =
 		{
 			//stats.begin();
 
+			if( graphics.hideVisibilityInFxView )
+			{
+				graphics.visibilityMeshes.visible = false;
+			}
+			graphics.topViewMeshes.visible = false;
 			graphics.setView( graphics.fxView );
 			graphics.renderer.render( graphics.scene, graphics.fxView.camera );
 
+			graphics.visibilityMeshes.visible = true;
+			graphics.topViewMeshes.visible = true;
 			graphics.setView( graphics.topView );
 			graphics.renderer.render( graphics.scene, graphics.topView.camera );
 
@@ -274,6 +290,10 @@ var graphics =
 		graphics.scene.remove( graphics.levelMeshes );
 		graphics.levelMeshes = new THREE.Object3D();
 		graphics.scene.add( graphics.levelMeshes );
+
+		graphics.scene.remove( graphics.visibilityMeshes );
+		graphics.visibilityMeshes = new THREE.Object3D();
+		graphics.scene.add( graphics.visibilityMeshes );
 	},
 
 	createWallMesh: function( start, end )
@@ -320,6 +340,7 @@ var graphics =
 			pos.x + 0.5 * dir.x,
 			pos.y + 0.5 * dir.y,
 			0.5 * WALLHEIGHT );
+		mesh.up.set( 0, 0, 1 );
 		mesh.lookAt( new THREE.Vector3(
 			mesh.position.x + dir.x,
 			mesh.position.y + dir.y,
@@ -358,6 +379,27 @@ var graphics =
 		}
 
 		return new THREE.Mesh( geom, material );
+	},
+
+	createGuardPreview: function( minAngle, maxAngle )
+	{
+		var SIZE = 3000;
+		var ZPOSITION = 10;
+
+		var geom;
+		if( minAngle <= 0 && maxAngle >= 2 * Math.PI )
+		{
+			geom = new THREE.PlaneGeometry( SIZE, SIZE );
+		}
+		else
+		{
+			geom = new THREE.CircleGeometry(
+				SIZE, 4, minAngle, maxAngle - minAngle );
+		}
+		geom.translate( 0, 0, ZPOSITION );
+		geom.rotateX( -0.5 * Math.PI );
+
+		return new THREE.Mesh( geom );
 	},
 
 	mouseEventCoord: function( event, coord )
