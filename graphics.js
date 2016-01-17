@@ -170,7 +170,7 @@ var graphics =
 
 	setFxHorizontalFOV: function( hfov )
 	{
-		hfov = Math.max( hfov, Math.PI );
+		hfov = Math.min( hfov, Math.PI );
 		var aspect = graphics.fxView.camera.aspect;
 		var vfov = 2 * Math.atan( Math.tan( 0.5 * hfov ) / aspect );
 		graphics.fxView.camera.fov = vfov * 180 / Math.PI;

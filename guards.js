@@ -55,7 +55,15 @@ var GuardTypes =
 					maxAngle: 0.25 * Math.PI
 				} );
 		},
-		graphics.createGuardPreview( -0.25 * Math.PI, 0.25 * Math.PI ) ),
+		graphics.createGuardPreview( -0.25 * Math.PI, 0.25 * Math.PI ),
+		function()
+		{
+			graphics.setFxHorizontalFOV( 0.5 * Math.PI );
+		},
+		function()
+		{
+			graphics.resetFxFOV();
+		} ),
 ]
 
 function Guard( type, position, polygon )
