@@ -55,6 +55,19 @@ function init()
 
 	ui.init();
 
+	UI.get( "completed-retry" ).onclick = function()
+	{
+		loadLevel( currentLevel );
+	};
+	UI.get( "completed-next" ).onclick = function()
+	{
+		var currentIndex = levels.indexOf( currentLevel );
+		if( currentIndex >= 0 )
+		{
+			loadLevel( levels[ currentIndex + 1 ] );
+		}
+	};
+
 	Dragging.init();
 
 	LevelEditor.init();

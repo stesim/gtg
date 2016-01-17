@@ -40,7 +40,7 @@
 		width: 100%;
 		transition: width 0.2s;
 	}
-	.horizontalMenu button
+	.horizontalMenu button, .anim100
 	{
 		width: 100px;
 		transition: width 0.2s;
@@ -49,7 +49,7 @@
 	{
 		width: 130%;
 	}
-	.horizontalMenu button:not([disabled]):hover
+	.horizontalMenu button:not([disabled]):hover, .anim100:not([disabled]):hover
 	{
 		width: 130px;
 	}
@@ -169,18 +169,28 @@
 		left: 0px;
 		width: 100%;
 		text-align: center;
+		padding-top: 20px;
 		padding-bottom: 20px;
+	}
+	.star
+	{
+		width: 64px;
+		margin-top: 20px;
+		margin-bottom: 20px;
 	}
 	</style>
 </head>
 <body style="margin: 0; padding: 0; overflow: hidden; color: #ffffff; background: #1b1b1b;">
 
 <div id="level-completed" class="transparent" style="display: none;">
-	<p class="title" style="margin: 20px;">LEVEL COMPLETED!</p>
-	<img id="completed-star1" style="width: 64px;" src="images/star.png"/>
-	<img id="completed-star2" style="width: 64px;" src="images/star.png"/>
-	<img id="completed-star3" style="width: 64px;" src="images/star.png"/>
-	<img id="completed-star4" style="width: 64px;" src="images/star.png"/>
+	<p class="title" style="margin: 0px;">LEVEL COMPLETED!</p>
+	<img id="completed-star1" class="star" src="images/star.png"/>
+	<img id="completed-star2" class="star" src="images/star.png"/>
+	<img id="completed-star3" class="star" src="images/star.png"/>
+	<img id="completed-star4" class="star" src="images/star.png"/>
+	<br/>
+	<button id="completed-retry" class="anim100">Retry</button>
+	<button id="completed-next" class="anim100">Next</button>
 </div>
 
 <p id="editor-title" style="display: none;"></p>

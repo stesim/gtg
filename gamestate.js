@@ -151,20 +151,15 @@ var GameStates =
 			}
 
 			UI.show( UI.get( "level-completed" ) );
-			ui.ingameMenu.retryButton.show();
 
 			var levelIndex = levels.indexOf( currentLevel );
-			if( levelIndex >= 0 && levelIndex < levels.length - 1 )
-			{
-				ui.ingameMenu.nextButton.show();
-			}
+			UI.setVisibility( UI.get( "completed-next" ),
+				( levelIndex >= 0 && levelIndex < levels.length - 1 ) );
 		},
 		function()
 		{
 			//ui.completionText.hide();
 			UI.hide( UI.get( "level-completed" ) );
-			ui.ingameMenu.nextButton.hide();
-			ui.ingameMenu.retryButton.hide();
 			ui.ingameMenu.hide();
 			ui.levelDetails.hide();
 			ui.guardDetails.hide();

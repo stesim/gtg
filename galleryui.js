@@ -139,22 +139,6 @@ var ui =
 				GameState.set( GameStates.Menu );
 			}, ui.ingameMenu ).position( { top: 0, left: 0 } ).show();
 
-		ui.ingameMenu.retryButton = new UI.Button( "Retry",
-			function()
-			{
-				loadLevel( currentLevel );
-			}, ui.ingameMenu ).position( { top: 0, left: 135 } );
-
-		ui.ingameMenu.nextButton = new UI.Button( "Next",
-			function()
-			{
-				var currentIndex = levels.indexOf( currentLevel );
-				if( currentIndex >= 0 )
-				{
-					loadLevel( levels[ currentIndex + 1 ] );
-				}
-			}, ui.ingameMenu ).position( { top: 0, left: 270 } );
-
 		ui.ingameMenu.overviewButton = new UI.Button( "Overview",
 			function()
 			{
