@@ -3,7 +3,7 @@ var ui =
 	init: function()
 	{
 		ui.titleText = new UI.Text( "GUARD THE GALLERY" )
-			.position( { top: 100, left: 100 } ).cssClass( "title" ).show();
+			.position( { top: 100, left: 100 } ).cssClass( "title" );
 
 		ui.mainMenu = new UI.Group()
 			.position( { top: 200, left: 100 } )
@@ -33,8 +33,6 @@ var ui =
 
 				GameStates.Menu.lastVisible = ui.developerMenu;
 			} ).position( { top: 120, left: 0 } ).show() );
-
-		ui.mainMenu.show();
 
 		ui.developerMenu = new UI.Group()
 			.position( { top: 200, left: 100 } )

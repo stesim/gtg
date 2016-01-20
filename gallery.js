@@ -43,6 +43,16 @@ function init()
 
 	time = new THREE.Clock( true );
 
+	graphics.onTexturesLoaded = function()
+	{
+		UI.hide( UI.get( "loading" ) );
+
+		LevelEditor.init();
+
+		GameState.set( GameStates.Menu );
+
+		graphics.render();
+	}
 	graphics.init( update );
 
 	graphics.renderer.domElement.
@@ -70,11 +80,7 @@ function init()
 
 	Dragging.init();
 
-	LevelEditor.init();
-
-	GameState.set( GameStates.Menu );
-
-	graphics.render();
+	graphics.disableRendering();
 }
 
 function onKeyDown( event )

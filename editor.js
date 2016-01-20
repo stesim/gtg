@@ -21,6 +21,7 @@ mouseUpHandler: null,
 mouseMoveHandler: null,
 mouseScrollHandler: null,
 
+selectedPictureElement: null,
 selectedPictureID: 0,
 currentPictureSize: 20,
 currentPicturePreview: null,
@@ -39,6 +40,7 @@ UI:
 	random:          UI.get( "editor-random" ),
 	normalize:       UI.get( "editor-normalize" ),
 
+	pictures:        UI.get( "editor-pictures" ),
 	properties:      UI.get( "editor-properties" ),
 	name:            UI.get( "editor-name" ),
 	description:     UI.get( "editor-description" ),
@@ -74,6 +76,7 @@ init: function()
 		graphics.pictureMaterials[ this.selectedPictureID ] );
 	this.helperMesh.scale.set(
 		this.currentPictureSize, this.currentPictureSize, 1 );
+	this.helperMesh.up.set( 0, 0, 1 );
 	this.helperMesh.visible = false;
 
 	this.pillarMesh = graphics.createPillarMesh( new THREE.Vector3() );
@@ -136,6 +139,36 @@ init: function()
 		this.UI.guardQuantities.push( number );
 	}
 
+	var onClickPicture = function( index, event )
+	{
+		this.changePictureType( index, event.target );
+	};
+
+	for( var i = 0; i < graphics.pictureMaterials.length; ++i )
+	{
+		var img = graphics.pictureMaterials[ i ].map.image;
+		if( i === this.selectedPictureID )
+		{
+			img.className = "editor-picture selected";
+			this.selectedPictureElement = img;
+		}
+		else
+		{
+			img.className = "editor-picture";
+		}
+		img.onclick = onClickPicture.bind( this, i );
+		this.UI.pictures.appendChild( img );
+		this.UI.pictures.appendChild( UI.linebreak() );
+	}
+
+	this.UI.pictures.addEventListener(
+		"mousewheel",
+		function( event )
+		{
+			event.stopPropagation();
+		},
+		false );
+
 	this.reset( true );
 },
 
@@ -182,6 +215,8 @@ reset: function( initial )
 
 	UI.hide( this.UI.properties );
 
+	UI.hide( this.UI.pictures );
+
 	this.resetProperties();
 },
 
@@ -216,6 +251,8 @@ onExit: function()
 	Dragging.onstart = null;
 	Dragging.onmove = null;
 	Dragging.onstop = null;
+
+	UI.hide( this.UI.pictures );
 
 	UI.hide( this.UI.menu );
 
@@ -367,6 +404,8 @@ finalizeGeometryState: function()
 
 		UI.show( this.UI.normalize );
 
+		UI.show( this.UI.pictures );
+
 		UI.setText( this.UI.title, "Place pictures" );
 
 		this.geometryFinished = true;
@@ -398,6 +437,8 @@ finalizePictureState: function()
 	UI.hide( this.UI.normalize );
 
 	UI.show( this.UI.properties );
+
+	UI.hide( this.UI.pictures );
 },
 
 finalize: function()
@@ -554,16 +595,27 @@ onMouseMove: function( event )
 	}
 },
 
-updateHelperSize: function()
+updateHelperSize: function( newSize )
 {
-	if( this.currentPictureSize > this.helperMesh.scale.y )
+	var image = graphics.pictureMaterials[ this.selectedPictureID ].map.image;
+	var invAspect = ( image.height / image.width );
+
+	var maxSize = WALLHEIGHT / invAspect;
+	if( this.currentPicturePreview )
+	{
+		maxSize = Math.min( maxSize, this.currentPicturePreview.edge.length() );
+	}
+
+	newSize = clamp( newSize, LevelEditor.MIN_PICTURE_SIZE, maxSize );
+
+	if( newSize > this.currentPictureSize && this.currentPicturePreview )
 	{
 		var originalPosition = this.currentPicturePreview.localCoordinate;
 		this.currentPicturePreview.localCoordinate =
 			this.clampPossiblePicturePosition(
 				this.currentPicturePreview.edge,
 				this.currentPicturePreview.localCoordinate,
-				this.currentPictureSize );
+				newSize );
 
 		if( this.currentPicturePreview.localCoordinate !== originalPosition )
 		{
@@ -571,8 +623,12 @@ updateHelperSize: function()
 		}
 	}
 
+	this.currentPictureSize = newSize;
+
 	this.helperMesh.scale.set(
-		this.currentPictureSize, this.currentPictureSize, 1 );
+		this.currentPictureSize,
+		this.currentPictureSize * invAspect,
+		1 );
 },
 
 onMouseScroll: function( event )
@@ -583,17 +639,34 @@ onMouseScroll: function( event )
 
 	if( this.currentPicturePreview !== null )
 	{
-		this.currentPictureSize = clamp(
-			this.currentPictureSize + delta * 5,
-			LevelEditor.MIN_PICTURE_SIZE,
-			Math.min( WALLHEIGHT, this.currentPicturePreview.edge.length() ) );
-
-		this.updateHelperSize();
+		this.updateHelperSize( this.currentPictureSize + delta * 5 );
 	}
 	else
 	{
 		graphics.overview.mouseScroll( delta );
 	}
+},
+
+changePictureType: function( index, elem )
+{
+	this.selectedPictureElement.className = "editor-picture";
+
+	this.selectedPictureID = index;
+	this.selectedPictureElement = event.target;
+
+	this.selectedPictureElement.className = "editor-picture selected";
+
+	this.helperMesh.material =
+		graphics.pictureMaterials[ this.selectedPictureID ];
+	var image = this.helperMesh.material.map.image;
+
+	var scale = this.currentPictureSize / image.width;
+	var height = scale * image.height;
+
+	var newSize = ( height > WALLHEIGHT ? WALLHEIGHT / height : 1 ) *
+		this.currentPictureSize;
+
+	this.updateHelperSize( newSize );
 },
 
 addPicture: function( id, edgeIndex, start, end )
@@ -663,8 +736,15 @@ placeRandomPictures: function()
 
 			while( wallLength >= pos + size + LevelEditor.PICTUREOFFSETMIN )
 			{
-				var id = Math.floor( Math.random() *
-					graphics.pictureMaterials.length );
+				var id;
+				var height;
+				do
+				{
+					id = Math.floor( Math.random() *
+						graphics.pictureMaterials.length );
+					var image = graphics.pictureMaterials[ id ].map.image;
+					height = image.height * size / image.width;
+				} while( height > WALLHEIGHT );
 
 				this.addPicture(
 					id,

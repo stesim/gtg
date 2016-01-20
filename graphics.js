@@ -59,6 +59,9 @@ var graphics =
 	wallMaterial: null,
 	floorMaterial: null,
 	visbilityMaterial: null,
+	numPictures: 38,
+	loadedPictures: 0,
+	onTexturesLoaded: null,
 	pictureMaterials: new Array(),
 	lookDirArrow: null,
 	levelMeshes: null,
@@ -113,7 +116,7 @@ var graphics =
 		light.position.set( 0, 0, 500 );
 		graphics.scene.add( light );
 
-		var ambientLight = new THREE.AmbientLight( 0x6666aa );
+		var ambientLight = new THREE.AmbientLight( 0xccccff );
 		graphics.scene.add( ambientLight );
 
 		graphics.wallMaterial =
@@ -141,10 +144,6 @@ var graphics =
 		graphics.visibilityMaterial.opacity = 0.2;
 		graphics.visibilityMaterial.needsUpdate = true;
 
-		var textureLoader = new THREE.TextureLoader();
-		graphics.pictureMaterials.push( new THREE.MeshPhongMaterial(
-			{ map: textureLoader.load( "apple.jpg" ) } ) );
-
 		graphics.lookDirArrow = new THREE.ArrowHelper(
 			new THREE.Vector3( 0, 0, -1 ),
 			new THREE.Vector3( 0, 100, 0 ),
@@ -154,6 +153,34 @@ var graphics =
 			20 );
 		graphics.lookDirArrow.visible = false;
 		graphics.fxView.camera.add( graphics.lookDirArrow );
+
+		var textureLoader = new THREE.TextureLoader();
+		
+		var onLoadTexture = function( index, texture )
+		{
+			if( ++graphics.loadedPictures >= graphics.numPictures &&
+				graphics.onTexturesLoaded )
+			{
+				graphics.onTexturesLoaded();
+			}
+		}
+
+		var zeros = "0000";
+		for( var i = 0; i < graphics.numPictures; ++i )
+		{
+			var numStr = i.toString();
+			var file =
+				"pictures/" + zeros.substr( numStr.length ) + numStr + ".jpg";
+
+			var texture = textureLoader.load( file,
+				onLoadTexture.bind( graphics, i ) );
+			graphics.pictureMaterials.push(
+				new THREE.MeshPhongMaterial( { map: texture } ) );
+
+			texture.generateMipmaps = false;
+			texture.minFilter = THREE.LinearFilter;
+			texture.magFilter = THREE.LinearFilter;
+		}
 	},
 
 	enableRendering: function()
@@ -331,9 +358,10 @@ var graphics =
 	createPictureMesh: function( id, pos, dir, size )
 	{
 		var material = graphics.pictureMaterials[ id ];
+		var invAspect = material.map.image.height / material.map.image.width;
 
 		var mesh = new THREE.Mesh(
-			new THREE.PlaneGeometry( size, size ),
+			new THREE.PlaneGeometry( size, size * invAspect ),
 			material );
 
 		mesh.position.set(

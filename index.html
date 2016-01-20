@@ -120,6 +120,23 @@
 		width: 100%;
 		box-sizing: border-box;
 	}
+	.rounded
+	{
+		padding: 8px 12px 12px 8px;
+		border-radius: 5px 12px;
+	}
+	#loading
+	{
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		widht: 14em;
+		height: 2em;
+		margin-top: -1em;
+		margin-left: -7em;
+		line-height: 2em;
+		text-align: center;
+	}
 	#editor-title
 	{
 		position: absolute;
@@ -145,12 +162,31 @@
 		right: 30%;
 		width: 40%;
 		min-width: 200px;
-		padding: 8px 12px 12px 8px;
-		border-radius: 5px 12px;
 	}
 	#editor-guardtypes
 	{
 		margin: 10px;
+	}
+	#editor-pictures
+	{
+		position: absolute;
+		top: 2%;
+		right: 15px;
+		height: 96%;
+		text-align: center;
+		overflow-y: scroll;
+		box-sizing: border-box;
+	}
+	.editor-picture
+	{
+		width: 128px;
+		cursor: pointer;
+		padding: 0px 3px;
+	}
+	#editor-pictures .selected
+	{
+		border: none;
+		background-color: #cccccc;
 	}
 	.button-hover:hover
 	{
@@ -182,6 +218,8 @@
 </head>
 <body style="margin: 0; padding: 0; overflow: hidden; color: #ffffff; background: #1b1b1b;">
 
+<div id="loading" class="transparent rounded">LOADING...</div>
+
 <div id="level-completed" class="transparent" style="display: none;">
 	<p class="title" style="margin: 0px;">LEVEL COMPLETED!</p>
 	<img id="completed-star1" class="star" src="images/star.png"/>
@@ -207,7 +245,10 @@
 	<button id="editor-finish" style="margin-top: 50px;">Finish</button>
 </div>
 
-<div class="transparent" id="editor-properties" style="display: none;">
+<div id="editor-pictures" class="rounded transparent" style="display: none;">
+</div>
+
+<div class="transparent rounded" id="editor-properties" style="display: none;">
 	<p>Name:</p>
 	<input type="text" class="fullwidth" id="editor-name"></input>
 	<p>Description:</p>
