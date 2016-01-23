@@ -10,20 +10,26 @@ function visibility( dcel, p, opt )
 		return clampAngle( Math.atan2( v.y - p.y, v.x - p.x ) - opt.direction );
 	}
 
+	function addVector( vectors, v )
+	{
+		if( vectors.length >= 2 &&
+			arePointsCollinear( vectors[ vectors.length - 2 ],
+								vectors[ vectors.length - 1 ],
+								v ) )
+		{
+			vectors[ vectors.length - 1 ].copy( v );
+		}
+		else
+		{
+			vectors.push( v.clone() );
+		}
+	}
+
 	function vertexCase( v )
 	{
-		function isOnLine( a )
-		{
-			return ( Math.abs( a ) < eps );
-		}
-		function isLeft( a )
-		{
-			return ( a > 0 );
-		}
-		function isRight( a )
-		{
-			return ( a < 0 );
-		}
+		function isOnLine( a ) { return ( Math.abs( a ) < eps ); }
+		function isLeft( a )   { return ( a > 0 ); }
+		function isRight( a )  { return ( a < 0 ); }
 
 		var dn = linePointDistance( p, v.pos, v.edge.next.origin.pos );
 		var dp = linePointDistance( p, v.pos, v.edge.prev.origin.pos );
@@ -160,7 +166,7 @@ function visibility( dcel, p, opt )
 
 				if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
 				{
-					visVectors.push( intersection );
+					addVector( visVectors, intersection );
 				}
 
 				minAngleReached = true;
@@ -188,7 +194,7 @@ function visibility( dcel, p, opt )
 
 				if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
 				{
-					visVectors.push( intersection );
+					addVector( visVectors, intersection );
 				}
 
 				maxAngleReached = true;
@@ -211,7 +217,7 @@ function visibility( dcel, p, opt )
 			var c = vertexCase( vertex );
 			if( c === 1 )
 			{
-				visVectors.push( vertex.pos.clone() );
+				addVector( visVectors, vertex.pos );
 			}
 			else
 			{
@@ -232,21 +238,21 @@ function visibility( dcel, p, opt )
 
 				if( c === 2 )
 				{
-					visVectors.push( vertex.pos.clone() );
+					addVector( visVectors, vertex.pos );
 				}
 
 				if( stopVertex !== null )
 				{
-					visVectors.push( stopVertex.pos.clone() );
+					addVector( visVectors, stopVertex.pos );
 				}
 				else
 				{
-					visVectors.push( intersection );
+					addVector( visVectors, intersection );
 				}
 
 				if( c === 3 )
 				{
-					visVectors.push( vertex.pos.clone() );
+					addVector( visVectors, vertex.pos );
 				}
 			}
 		}
@@ -263,8 +269,19 @@ function visibility( dcel, p, opt )
 
 		if( intersection.distanceTo( visVectors[ 0 ] ) >= eps )
 		{
-			visVectors.push( intersection );
+			addVector( visVectors, intersection );
 		}
+	}
+
+	while( visVectors.length >= 3 &&
+		( arePointsCollinear( visVectors[ visVectors.length - 2 ],
+							  visVectors[ visVectors.length - 1 ],
+							  visVectors[ 0 ] ) ||
+		  arePointsCollinear( visVectors[ visVectors.length - 1 ],
+							  visVectors[ 0 ],
+							  visVectors[ 1 ] ) ) )
+	{
+		visVectors[ 0 ].copy( visVectors.pop() );
 	}
 
 	return new DCEL().simpleFromVectorList( visVectors, true );

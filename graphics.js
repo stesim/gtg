@@ -377,26 +377,27 @@ var graphics =
 		return mesh;
 	},
 
-	createPolygonMesh: function( dcel, material, color )
+	createDCELFaceShape: function( dcel, face )
 	{
-		if( dcel.faces.length <= 0 )
-		{
-			return null;
-		}
-
 		var shape = new THREE.Shape();
-		shape.moveTo( dcel.edges[ 0 ].origin.pos.x, dcel.edges[ 0 ].origin.pos.y );
 
-		var iter = dcel.edges[ 0 ].next;
-		while( iter !== dcel.edges[ 0 ] )
+		shape.moveTo( face.edge.origin.pos.x,
+		              face.edge.origin.pos.y );
+
+		var iter = face.edge.next;
+		while( iter !== face.edge )
 		{
 			shape.lineTo( iter.origin.pos.x, iter.origin.pos.y );
-
 			iter = iter.next;
 		}
 
-		for( var i = 1; i < dcel.faces.length; ++i )
+		for( var i = 0; i < dcel.faces.length; ++i )
 		{
+			if( dcel.faces[ i ].tag || dcel.faces[ i ].edge.twin.face !== face )
+			{
+				continue;
+			}
+
 			var hole = new THREE.Path();
 			var start = dcel.faces[ i ].edge.twin;
 			var iter = start;
@@ -412,7 +413,26 @@ var graphics =
 			shape.holes.push( hole );
 		}
 
-		var geom = shape.makeGeometry();
+		return shape;
+	},
+
+	createDCELMesh: function( dcel, material, color )
+	{
+		if( dcel.faces.length <= 0 )
+		{
+			return null;
+		}
+
+		var shapes = new Array();
+		for( var i = 0; i < dcel.faces.length; ++i )
+		{
+			if( dcel.faces[ i ].tag )
+			{
+				shapes.push( this.createDCELFaceShape( dcel, dcel.faces[ i ] ) );
+			}
+		}
+
+		var geom = new THREE.ShapeGeometry( shapes );
 
 		if( color )
 		{
@@ -423,6 +443,11 @@ var graphics =
 		}
 
 		return new THREE.Mesh( geom, material );
+	},
+
+	createPolygonMesh: function( dcel, material, color )
+	{
+		return this.createDCELMesh( dcel, material, color );
 	},
 
 	createLevelMeshes: function( dcel )

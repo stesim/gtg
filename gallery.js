@@ -688,7 +688,7 @@ function removePictureVisibilityFrom( guard )
 	}
 }
 
-function checkCompletion()
+function checkPictureCompletion()
 {
 	var completed = true;
 	for( var i = 0; i < pictureVisibility.length; ++i )
@@ -704,4 +704,45 @@ function checkCompletion()
 	{
 		GameState.set( GameStates.LevelCompleted );
 	}
+}
+
+function checkAreaCompletion()
+{
+	if( guards.length <= 0 ) { return; }
+
+	var sum = guards[ 0 ].polygon;
+	for( var i = 1; i < guards.length; ++i )
+	{
+		sum = union( sum, guards[ i ].polygon );
+	}
+
+	var guardedArea = 0;
+	for( var i = 0; i < sum.faces.length; ++i )
+	{
+		if( sum.faces[ i ].tag )
+		{
+			guardedArea += sum.faceArea( sum.faces[ i ] );
+		}
+	}
+
+	var totalArea = 0;
+	for( var i = 0; i < dcel.faces.length; ++i )
+	{
+		if( dcel.faces[ i ].tag )
+		{
+			totalArea += dcel.faceArea( dcel.faces[ i ] );
+		}
+	}
+
+	console.log( guardedArea + " / " + totalArea + " (" + ( 100 * guardedArea / totalArea ) + "%)" );
+
+	if( guardedArea / totalArea >= 0.998 )
+	{
+		GameState.set( GameStates.LevelCompleted );
+	}
+}
+
+function checkCompletion()
+{
+	checkAreaCompletion();
 }

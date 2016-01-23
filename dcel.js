@@ -13,35 +13,7 @@ DCEL.prototype.simpleFromVectorList = function( vectors, order )
 {
 	function checkIfCCW( poly )
 	{
-		var origin = poly[ 0 ].clone().add( poly[ 1 ] ).multiplyScalar( 0.5 );
-		var normal = lineNormal( poly[ 0 ], poly[ 1 ] );
-		var target = origin.clone().add( normal );
-
-		var intersectedSegments = 0;
-		for( var i = 2; i < poly.length; ++i )
-		{
-			var xintersect = extendedLineIntersection(
-				origin, target, poly[ i - 1 ], poly[ i ] );
-
-			if( xintersect != null &&
-				xintersect[ 2 ] >= 0.0 && xintersect[ 2 ] <= 1.0 &&
-				xintersect[ 0 ].sub( origin ).dot( normal ) > 0.0 )
-			{
-				++intersectedSegments;
-			}
-		}
-
-		var xintersect = extendedLineIntersection(
-			origin, target, poly[ poly.length - 1 ], poly[ 0 ] );
-
-		if( xintersect != null &&
-			xintersect[ 2 ] >= 0.0 && xintersect[ 2 ] <= 1.0 &&
-			xintersect[ 0 ].sub( origin ).dot( normal ) > 0.0 )
-		{
-			++intersectedSegments;
-		}
-
-		return ( intersectedSegments % 2 == 1 );
+		return ( pointListArea( poly ) > 0 );
 	}
 
 	this.edges.length = 0;
@@ -70,6 +42,8 @@ DCEL.prototype.simpleFromVectorList = function( vectors, order )
 
 	var root = new HalfEdge();
 	var face = new Face( root );
+	face.tag = true;
+
 	root.origin = new Vertex( root, vectors[ 0 ] );
 	root.face = face;
 	root.tag = 0; // TODO: remove
@@ -109,37 +83,79 @@ DCEL.prototype.fromVectorList = function( polygon, holes, forceOrderCheck )
 
 	this.simpleFromVectorList( polygon, order );
 
-	order = ( forceOrderCheck ? DCEL.prototype.CW : DCEL.prototype.ACCEPT );
-
-	for( var i = 0; i < holes.length; ++i )
+	if( holes )
 	{
-		var hole = new DCEL().simpleFromVectorList( holes[ i ], order );
-		var face = hole.faces[ 0 ];
-		for( var j = 0; j < hole.edges.length; ++j )
+		for( var i = 0; i < holes.length; ++i )
 		{
-			var edge = hole.edges[ j ];
-			edge.face = this.faces[ 0 ];
-			edge.twin = new HalfEdge();
-
-			this.vertices.push( edge.origin );
-			this.edges.push( edge );
+			this.addHole( this.faces[ 0 ], holes[ i ], forceOrderCheck );
 		}
-		for( var j = 0; j < hole.edges.length; ++j )
-		{
-			var edge = hole.edges[ j ];
-			edge.twin.face = face;
-			edge.twin.origin = edge.next.origin;
-			edge.twin.next = edge.prev.twin;
-			edge.twin.prev = edge.next.twin;
-			edge.twin.twin = edge;
-
-			this.edges.push( edge.twin );
-		}
-		face.edge = hole.edges[ 0 ].twin;
-		this.faces.push( face );
 	}
 
 	return this;
+}
+
+DCEL.prototype.addHole = function( face, points, forceOrderCheck )
+{
+	var order = ( forceOrderCheck ? DCEL.prototype.CW : DCEL.prototype.ACCEPT );
+	var hole = new DCEL().simpleFromVectorList( points, order );
+	for( var j = 0; j < hole.edges.length; ++j )
+	{
+		var edge = hole.edges[ j ];
+		edge.face = face;
+		edge.twin = new HalfEdge();
+
+		this.vertices.push( edge.origin );
+		this.edges.push( edge );
+	}
+	for( var j = 0; j < hole.edges.length; ++j )
+	{
+		var edge = hole.edges[ j ];
+		edge.twin.face = hole.faces[ 0 ];
+		edge.twin.origin = edge.next.origin;
+		edge.twin.next = edge.prev.twin;
+		edge.twin.prev = edge.next.twin;
+		edge.twin.twin = edge;
+
+		this.edges.push( edge.twin );
+	}
+	hole.faces[ 0 ].edge = hole.edges[ 0 ].twin;
+	hole.faces[ 0 ].tag = false;
+	this.faces.push( hole.faces[ 0 ] );
+}
+
+DCEL.prototype.addDisjointFace = function( points, forceOrderCheck )
+{
+	var order = ( forceOrderCheck ? DCEL.prototype.CCW : DCEL.prototype.ACCEPT );
+	var face = new DCEL().simpleFromVectorList( points, order );
+	for( var j = 0; j < face.edges.length; ++j )
+	{
+		var edge = face.edges[ j ];
+
+		this.vertices.push( edge.origin );
+		this.edges.push( edge );
+	}
+	face.faces[ 0 ].tag = true;
+	this.faces.push( face.faces[ 0 ] );
+}
+
+DCEL.prototype.addFace = function( points )
+{
+	var isHole = ( pointListArea( points ) < 0 );
+	if( !isHole )
+	{
+		this.addDisjointFace( points );
+	}
+	else
+	{
+		for( var i = 0; i < this.faces.length; ++i )
+		{
+			if( this.isPointInFace( points[ 0 ], this.faces[ i ] ) )
+			{
+				this.addHole( this.faces[ i ], points );
+				break;
+			}
+		}
+	}
 }
 
 DCEL.prototype.clearTemp = function()
@@ -160,22 +176,56 @@ DCEL.prototype.clearTemp = function()
 
 DCEL.prototype.isPointInFace = function( point, face )
 {
-	if( !face.boundaryContains( point ) )
+	var angle = Math.random() * 2 * Math.PI;
+	var target =
+		new THREE.Vector2( Math.cos( angle ), Math.sin( angle ) ).add( point );
+
+	var intersections = 0;
+	for( var i = 0; i < this.edges.length; ++i )
 	{
-		return false;
-	}
-	else
-	{
-		for( var i = 0; i < this.faces.length; ++i )
+		var edge = this.edges[ i ];
+		if( edge.face === face )
 		{
-			if( this.faces[ i ] !== face &&
-				this.faces[ i ].boundaryContains( point ) )
+			var intersection = halfLineEdgeIntersection( point, target, edge );
+			if( intersection !== null )
 			{
-				return false;
+				++intersections;
 			}
 		}
-		return true;
 	}
+	return ( ( intersections % 2 ) !== 0 );
+}
+
+DCEL.prototype.faceArea = function( face )
+{
+	// efficient simple polygon area computation, cf.:
+	//   http://geomalgorithms.com/a01-_area.html#2D%20Polygons
+
+	var A = 0;
+	for( var i = 0; i < this.edges.length; ++i )
+	{
+		var edge = this.edges[ i ];
+		if( edge.face === face )
+		{
+			A += edge.origin.pos.x *
+				( edge.next.origin.pos.y - edge.prev.origin.pos.y );
+		}
+	}
+	return ( 0.5 * A );
+}
+
+DCEL.prototype.removeVertex = function( v )
+{
+	v.edge.prev.next = v.edge.next;
+	v.edge.next.prev = v.edge.prev;
+
+	if( v.edge.face.edge === v.edge )
+	{
+		v.edge.face.edge = v.edge.next;
+	}
+
+	this.edges.splice( this.edges.indexOf( v.edge ), 1 );
+	this.vertices.splice( this.vertices.indexOf( v ), 1 );
 }
 
 function Vertex( e, pos )
@@ -207,6 +257,11 @@ Vertex.prototype.findEdgeOnFace = function( face )
 Vertex.prototype.isConvex = function()
 {
 	return ( this.edge.direction().dot( this.edge.prev.normal() ) > 0 );
+}
+
+Vertex.prototype.isCollinear = function()
+{
+	return ( Math.abs( cross2D( this.edge.prev.vector(), this.edge.vector() ) ) < eps );
 }
 
 function Face( e )
@@ -264,7 +319,7 @@ Face.prototype.extractVertices = function()
 	return vertices;
 }
 
-Face.prototype.area = function()
+Face.prototype.boundaryArea = function()
 {
 	// efficient simple polygon area computation, cf.:
 	//   http://geomalgorithms.com/a01-_area.html#2D%20Polygons
@@ -297,18 +352,16 @@ Face.prototype.boundaryContains = function( point )
 	var iter = this.edge;
 	do
 	{
-		var intersection = extendedLineIntersection(
-			point, target, iter.origin.pos, iter.next.origin.pos );
-		if( intersection[ 1 ] >= 0.0 &&
-			intersection[ 2 ] >= 0.0 && intersection[ 2 ] <= 1.0 )
+		var intersection = halfLineEdgeIntersection( point, target, iter );
+		if( intersection !== null )
 		{
 			++intersections;
 		}
 
 		iter = iter.next;
-	} while( iter != this.edge );
+	} while( iter !== this.edge );
 
-	return ( intersections % 2 != 0 );
+	return ( ( intersections % 2 ) !== 0 );
 }
 
 function HalfEdge()

@@ -47,13 +47,35 @@ function cross2D( a, b )
 	return ( a.x * b.y - a.y * b.x );
 }
 
+function arePointsCollinear( a, b, c )
+{
+	var ab = b.clone().sub( a );
+	var bc = c.clone().sub( b );
+
+	return ( Math.abs( cross2D( ab, bc ) ) < eps )
+}
+
+function pointListArea( vectors )
+{
+	var A = vectors[ 0 ].x *
+		( vectors[ 1 ].y - vectors[ vectors.length - 1 ].y );
+	for( var i = 1; i < vectors.length - 1; ++i )
+	{
+		A += vectors[ i ].x *
+			( vectors[ i + 1 ].y - vectors[ i - 1 ].y );
+	}
+	A += vectors[ vectors.length - 1 ].x *
+		( vectors[ 0 ].y - vectors[ vectors.length - 2 ].y );
+	return ( 0.5 * A );
+}
+
 function extendedLineIntersection( a, b, p, q )
 {
 	var ab = b.clone().sub( a );
 	var pq = q.clone().sub( p );
 	var abxpq = cross2D( ab, pq );
 
-	if( Math.abs( abxpq ) < 0.00001 )
+	if( Math.abs( abxpq ) < eps )
 	{
 		return null;
 	}
@@ -65,21 +87,52 @@ function extendedLineIntersection( a, b, p, q )
 	return [ ab.multiplyScalar( s ).add( a ), s, t ];
 }
 
-function isPointOnSegment( p, a, b )
+function pointLineProjection( p, a, b )
 {
 	var line = b.clone().sub( a );
 	var proj = line.dot( p.clone().sub( a ) ) / line.lengthSq();
+
+	return proj;
+}
+
+function isPointOnSegment( p, a, b )
+{
+	var proj = pointLineProjection( p, a, b );
 
 	return ( Math.abs( linePointDistance( a, b, p ) ) < eps &&
 		proj > -eps && proj < ( 1 + eps ) );
 }
 
+function halfLineEdgeIntersection( a, b, edge )
+{
+	var dir = b.clone().sub( a );
+
+	var intersection = extendedLineIntersection(
+		a, b, edge.origin.pos, edge.next.origin.pos );
+
+	if( intersection !== null &&
+		intersection[ 2 ] > -eps && intersection[ 2 ] < ( 1 + eps ) &&
+		( intersection[ 1 ] >= eps ||
+		  ( intersection[ 1 ] > -eps && edge.normal().dot( dir ) < 0 ) ) &&
+		( intersection[ 2 ] >= eps ||
+		  edge.prev.normal().dot( dir ) < 0 ||
+		  edge.origin.isConvex() ) &&
+		( intersection[ 2 ] <= ( 1 - eps ) ||
+		  edge.next.normal().dot( dir ) < 0 ||
+		  edge.next.origin.isConvex() )
+	  )
+	{
+		return intersection;
+	}
+	else
+	{
+		return null;
+	}
+}
+
 function findClosestDCELFaceHalfLineIntersection(
 	dcel, face, a, b, excludeEdges )
 {
-	var dir = b.clone().sub( a );
-	var pvdist = dir.length();
-	dir.divideScalar( pvdist );
 
 	var closestIntersection = null;
 	var intersectedEdge = null;
@@ -92,22 +145,11 @@ function findClosestDCELFaceHalfLineIntersection(
 			continue;
 		}
 
-		var intersection = extendedLineIntersection(
-			a, b, edge.origin.pos, edge.next.origin.pos );
+		var intersection = halfLineEdgeIntersection( a, b, edge );
 
 		if( intersection !== null &&
 			( closestIntersection === null ||
-			  intersection[ 1 ] < closestIntersection[ 1 ] ) &&
-			intersection[ 2 ] > -eps && intersection[ 2 ] < ( 1 + eps ) &&
-			( intersection[ 1 ] >= eps ||
-			  ( intersection[ 1 ] > -eps && edge.normal().dot( dir ) < 0 ) ) &&
-			( intersection[ 2 ] >= eps ||
-			  edge.prev.normal().dot( dir ) < 0 ||
-			  edge.origin.isConvex() ) &&
-			( intersection[ 2 ] <= ( 1 - eps ) ||
-			  edge.next.normal().dot( dir ) < 0 ||
-			  edge.next.origin.isConvex() )
-		  )
+			  intersection[ 1 ] < closestIntersection[ 1 ] ) )
 		{
 			closestIntersection = intersection;
 			intersectedEdge = edge;
