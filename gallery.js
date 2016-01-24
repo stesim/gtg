@@ -668,6 +668,7 @@ function switchToFirstPerson( guard )
 
 	graphics.levelMeshes.remove( guard.guardMesh );
 	guard.guardMesh.position.set( 0, 0, 0 );
+	guard.guardMesh.rotation.z = 0; // TODO: HACK
 	graphics.fxView.camera.add( guard.guardMesh );
 
 	graphics.lookDirArrow.visible = true;
