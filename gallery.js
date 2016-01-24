@@ -2,6 +2,8 @@ var WALLHEIGHT = 100;
 var WALLWIDTH = 10;
 var PILLARHEIGHT = 103;
 var VISIBILITY_THRESHOLD = 2;
+var TRANSLATION_RADIUS = 15;
+var ROTATION_RADIUS = 25;
 
 var ZAXIS = new THREE.Vector3( 0, 0, 1 );
 
@@ -24,10 +26,12 @@ var availableGuards = new Array( GuardTypes.length );
 var isInFirstPerson = false;
 var firstPersonGuard = null;
 var lastFxCamRotation = 0.0;
-var lastOverviewCamRotation = 0.0;
-var lastOverviewCamPosition = new THREE.Vector3( 0, 0, 700 );
 var moveOverviewByDrag = true;
 var pickedGuard = null;
+var rotatePickedGuard = false;
+var guardStartRotation = 0.0;
+
+var rotationMesh = null;
 
 init();
 
@@ -55,10 +59,27 @@ function init()
 	}
 	graphics.init( update );
 
+	rotationMesh = new THREE.Mesh(
+		new THREE.CircleGeometry( ROTATION_RADIUS, 16 ),
+		new THREE.MeshBasicMaterial( { color: 0xffffff } ) );
+	rotationMesh.position.z = 1;
+
+	var rotationLineGeom = new THREE.Geometry();
+	rotationLineGeom.vertices.push(
+		new THREE.Vector3( 0, 0, 0 ),
+		new THREE.Vector3( ROTATION_RADIUS, 0, 0 ) );
+	var rotationLine = new THREE.Line(
+		rotationLineGeom,
+		new THREE.LineBasicMaterial( { color: 0x000000 } ) );
+	rotationLine.position.z = 0.1;
+	rotationMesh.add( rotationLine );
+
 	graphics.renderer.domElement.
 		addEventListener( "mousedown", onMouseDown, false );
 	graphics.renderer.domElement.
 		addEventListener( "mousewheel", onMouseScroll, false );
+	graphics.renderer.domElement.
+		addEventListener( "mousemove", onMouseMove, false );
 
 	document.addEventListener( "keydown", onKeyDown, false );
 	document.addEventListener( "keyup", onKeyUp, false );
@@ -382,6 +403,15 @@ function moveGuard( guard, p )
 	addPictureVisibilityFrom( guard );
 }
 
+function rotateGuard( guard, dir )
+{
+	removePictureVisibilityFrom( guard );
+
+	guard.rotate( dir, dcel );
+
+	addPictureVisibilityFrom( guard );
+}
+
 function removeGuard( guard )
 {
 	removePictureVisibilityFrom( guard );
@@ -394,24 +424,50 @@ function removeGuard( guard )
 	updateGuardDetails();
 }
 
-function findGuardNear( p )
+function findGuardNear( p, distance )
 {
+	var threshold = ( distance ? distance : 15.0 );
+	var current = null;
+	var currentDist = Infinity;
 	for( var i = 0; i < guards.length; ++i )
 	{
-		if( p.distanceTo( guards[ i ].position ) < 15.0 )
+		var dist = p.distanceTo( guards[ i ].position );
+		if( dist < threshold &&
+			( current === null || dist < currentDist ) )
 		{
-			return guards[ i ];
+			current = guards[ i ];
+			currentDist = dist;
 		}
 	}
-	return null;
+	return current;
+}
+
+function updateRotationMesh( p )
+{
+	var guard = findGuardNear( p, ROTATION_RADIUS );
+
+	if( guard !== null && rotationMesh.parent !== guard.guardMesh )
+	{
+		guard.guardMesh.add( rotationMesh );
+	}
+	else if( guard === null && rotationMesh.parent !== null )
+	{
+		rotationMesh.parent.remove( rotationMesh );
+	}
 }
 
 function onDragStart()
 {
-	if( !isInFirstPerson && pickedGuard !== null &&
-		pickedGuard.visibilityMesh !== null )
+	if( !isInFirstPerson && pickedGuard !== null )
 	{
-		pickedGuard.visibilityMesh.visible = false;
+		if( pickedGuard.visibilityMesh !== null )
+		{
+			pickedGuard.visibilityMesh.visible = false;
+		}
+		if( rotatePickedGuard )
+		{
+			guardStartRotation = pickedGuard.direction;
+		}
 	}
 }
 
@@ -424,14 +480,24 @@ function onDragStop()
 			var p = graphics.screenToWorldPosition( Dragging.last );
 			if( p === null ) { return; }
 
-			if( dcel.isPointInFace( p, dcel.faces[ 0 ] ) )
+			if( !rotatePickedGuard )
 			{
-				moveGuard( pickedGuard, p );
-				checkCompletion();
+				if( dcel.isPointInFace( p, dcel.faces[ 0 ] ) )
+				{
+					moveGuard( pickedGuard, p );
+					checkCompletion();
+				}
+				else
+				{
+					removeGuard( pickedGuard );
+				}
 			}
 			else
 			{
-				removeGuard( pickedGuard );
+				rotateGuard( pickedGuard, pickedGuard.guardMesh.rotation.z );
+				checkCompletion();
+
+				updateRotationMesh( p );
 			}
 		}
 		else
@@ -461,7 +527,23 @@ function onDragMove()
 		var p = graphics.screenToWorldPosition( Dragging.last );
 		if( p !== null )
 		{
-			pickedGuard.guardMesh.position.set( p.x, p.y, 0 );
+			if( !rotatePickedGuard )
+			{
+				pickedGuard.guardMesh.position.set( p.x, p.y, 0 );
+			}
+			else
+			{
+				var delta = p.clone().sub( pickedGuard.position );
+				if( Math.abs( delta.x ) >= eps || Math.abs( delta.y ) >= eps )
+				{
+					var dir = Math.atan2( delta.y, delta.x );
+					pickedGuard.guardMesh.rotation.z = dir;
+				}
+				else
+				{
+					pickedGuard.guardMesh.rotation.z = guardStartRotation;
+				}
+			}
 		}
 	}
 }
@@ -482,7 +564,17 @@ function onMouseDown( event )
 			var p = graphics.screenToWorldPosition( coord );
 			if( p === null ) { return; }
 
-			pickedGuard = findGuardNear( p );
+			pickedGuard = findGuardNear( p, TRANSLATION_RADIUS );
+
+			if( pickedGuard === null )
+			{
+				pickedGuard = findGuardNear( p, ROTATION_RADIUS );
+				rotatePickedGuard = true;
+			}
+			else
+			{
+				rotatePickedGuard = false;
+			}
 		}
 	}
 }
@@ -509,6 +601,8 @@ function onMouseUp( event )
 				{
 					addGuard( p );
 					checkCompletion();
+
+					updateRotationMesh( p );
 				}
 			}
 			else
@@ -541,6 +635,20 @@ function onMouseScroll( event )
 	}
 
 	return false;
+}
+
+function onMouseMove( event )
+{
+	if( !Dragging.active )
+	{
+		var coord =
+			new THREE.Vector2( event.clientX, graphics.HEIGHT - event.clientY );
+
+		var p = graphics.screenToWorldPosition( coord );
+		if( p === null ) { return; }
+
+		updateRotationMesh( p );
+	}
 }
 
 function switchToFirstPerson( guard )

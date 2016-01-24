@@ -101,6 +101,7 @@ Guard.prototype.move = function( position, polygon )
 	this.position = position;
 
 	this.guardMesh.position.set( position.x, position.y, 0 );
+	this.guardMesh.rotation.z = this.direction;
 
 	this.polygon = this.type.visibility( polygon, this );
 
@@ -111,6 +112,14 @@ Guard.prototype.move = function( position, polygon )
 		this.visibilityMesh.position.z = 0.1;
 		graphics.visibilityMeshes.add( this.visibilityMesh );
 	}
+}
+
+Guard.prototype.rotate = function( direction, polygon )
+{
+	console.log( direction );
+	this.direction = direction;
+	this.guardMesh.rotation.z = direction;
+	this.move( this.position, polygon );
 }
 
 Guard.prototype.removeMeshes = function()
