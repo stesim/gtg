@@ -267,73 +267,6 @@
 
 <div id="loading" class="transparent rounded">LOADING...</div>
 
-<div id="about" style="display: none;">
-	<div id="about-menu">
-		<button id="about-button-back" style="margin-bottom: 50px;">BACK</button>
-		<button id="about-button-howto">How to play</button>
-		<button id="about-button-concepts">Concepts</button>
-		<button id="about-button-algorithms">Algorithms</button>
-	</div>
-	<div id="about-content-wrapper" class="transparent rounded">
-		<div id="about-content">
-			<div id="about-howto" class="justified">
-				<p class="title">How to play</p>
-				<p><i>Guard the Gallery</i> is planned to offer two game modes: a single-player mode and a local multi-player mode. Unfortunately <i>Versus Mode</i> is not yet available.</p>
-				<p>Select <i>Story Mode</i> from the main menu to start playing the single-player levels.
-				<i>Continue</i> lets you continue from the level you last played or start from the beginning if this is your first time playing.
-				<i>Select Level</i> lets you select and replay your favorite levels in the story mode.</p>
-				<p>The aim of the game is to guard a gallery by placing guards/cameras. Each camera type has its specific field of view. In a level, the budget and available camera types are listed on the right side of the screen. Click on a camera type and then click inside the gallery to place it at that position. Click and drag a camera to reposition it or click and drag the hightlighted circle to change the direction it is facing. A level is completed when one can oversee all of the gallery with the placed cameras, while not exceeding the budget. After completing the level, you can either continue to the next one or replay the level if you were not able to collect all three stars. Stars are rewarded as follows:</p>
-				<p><img class="mini-star" src="images/star.png"/> : You have completed the level, but you spent the entire budget.</p>
-				<p><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/> : You managed to complete the level, but the solution was more expensive than necessary.</p>
-				<p><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/> : You have completed the level using the least amount of resources possible.</p>
-			</div>
-			<div id="about-concepts" class="justified" style="display: none;">
-				<p class="title">Geometric concepts</p>
-				<p>In geometry, a polygon is a closed figure defined by a certain amount of points and line segments between them such that one contiguous region is enclosed. This game is based on the geometry of polygons and their intersections/unions.</p>
-
-				<p>More specifically, it is inspired by the <i>Art Gallery Problem</i>, which is the problem of finding a set of guards which cover a polygon entirely. We describe the layout of a gallery as a 2D polygon with <i>n</i> points, being the corners of the room. By placing cameras (in essence planes, half-planes, quarter-planes) one must cover the entire gallery. Of course one cannot see through walls, so we must be able to compute the intersection of those planes with our gallery polygon to see what the camera can really overlook. This fact also implies that the region a camera can overlook is again contiguous.</p>
-
-				<p>In the case where there are multiple cameras deployed, we want to know what the total overlooked area is. Therefore we must also be able to compute the area of two (generally overlapping) polygons.</p>
-			</div>
-			<div id="about-algorithms" class="justified" style="display: none;">
-				<p class="title">Algorithms</p>
-				<p>The game mainly relies on two geometric algorithms and one data-structure, which are described in the detail below.</p>
-				<p>
-					<b>Doubly-Connected Edge List</b><br/>
-					<p>A <i>doubly-connected edge list (DCEL)</i> is a data-structure often used to describe a decomposition of a plane. It holds describes the relations between points, line segments and faces. If we consider the decompoisition as a graph, the points are represented by <i>vertices</i> and the line segments by <i>edges</i>. Since each edge borders two <i>faces</i>, edges are further split in <i>half-edges</i>, one in each of the two directions of the line segment.</p>
-
-					<p>As the name suggests, the half-edges form a doubly linked list, i.e. each half-edge points to its predecessor and to its successor. Further, each half-edge contains pointers to its origin vertex, the face it is defining as well as its <i>twin</i> half-edge. Vertices contain a pointer to one of the half-edges originating from that vertex as well as its position as a 2D vector. Faces have only a pointer to one of their defining half-edges. Additionally, all entries are given two fields for arbitrary payloads. A <i>tag</i> field is used to store permanent information associated with that entry and a <i>temp</i> field is used to store temporary information, such as flags or states used in specific functions. To fully define the DCEL, the winding order of the edges defining the faces must fixed. In our case, we have chosen it to be counterclockwise.</p>
-
-					<p>For convenience, all entries of the DCEL are further contained in lists, one per entry type. This allows, for instance, easier iteration over all half-edges regardless of which face they belong to. Due to the relatively small DCEL sizes in the game, convenience was chose over the slightly larger memory footprint.</p>
-
-					<b>Visibility Polygon</b><br/>
-					<p>An essential part of the game is obviously computing which part of the gallery each camera can see. The resulting shape is called the <i>visibility polygon</i> of the point representing the position of the camera. To compute the visibility polygons we employ a typical angular sweep algorithm. While the algorithm would normally have a complexity of order <i>O(n log(n))</i> using an appropriate status data-structure, our implementation has a complexity of order <i>O(n²)</i> due to time constraints. Once again, due to the low number of vertices/edges <i>n</i>, the run-time difference is marginal.</p>
-
-					<p>As the first step of the algorithm, all vertices are sorted by their angle relative to the direction the guard is facing. To account for collinear points, vertices with the same angle are further sorted by their distance from the guard. Afterwards, the vertices are traversed in the sorted order. For each vertex a half-line starting at the guard and passing through that vertex is intersected with all edges bordering the "main" face (i.e. visible part of the level, unlike holes) to find the closest intersection to the guard. If that intersection is closer to the guard, then the regarded vertex is not visible and nothing has to be done. Otherwise, firstly the number of consecutive collinear points is counted. Then, the current, and closest collinear, vertex is assigned assigned one of three categories depending on the position of its two incident half-edges. Examples of the three cases are illustrated below, where the red dots indicate the current vertex and the green dots represent the guard.</p>
-					<p style="text-align: center;"><img src="images/visibility-cases.png"/></p>
-					<p>If the current vertex is of type 1, then the visibility of the guard is obviously blocked by it, so the vertex is added to the visibility polygon and any further collinear vertices are skipped. If the vertex is of either type 2 or type 3, a linear search is performed to find the first collinear vertex of a different type closer to the guard than the previously computed closest intersection. If such a vertex is found, it is considered to block visibility, so it is part of the visibility polygon. If the search did not yield a result, the closest intersection point takes its place instead. The order in which the original vertex and the result of the search are added depends on the type of the closest vertex. Then, once again, the iteration skips to the next non-collinear vertex and repeats the same process.</p>
-
-					<p>Due to the nature of the algorithm, guards with limited field of view angles can be considered by defining a minimal and a maximal angle for the guard. When iterating over the vertices, all vertices with angles outside of this interval can be ignored as they will definitely not be visible. However, when stepping over each of the boundaries of the interval, an additional point must be added to the visibility polygon, if there is no vertex at that specific angle.</p>
-
-					<b>Union Computation</b>
-					<p>In order to check if a level is completed, we must determine what the ratio of guarded to total area of the polygon is. The guarded area is the area of the union of all visibility polygons. Since those are generally overlapping, we cannot simply add the individual areas. Instead, we compute the union explicitly and then determine its area. While computing the union of simple polygons in itself is not trivial, matters are further complicated by the fact that the union of two visibility polygons is in general not a simple polygon anymore, but can contain disjoint polygons and holes.</p>
-
-					<p>In order to simplify the algorithm as much as possible, we consider a binary union operation instead of computing the union of all polygons at once. Thus, for each visibility polygon but the first one, a union operation with an intermediate result is performed to get the complete union. Accordingly, the input is assumed to consist of, firstly, a polygonal shape possibly containing multiple disjoint faces with holes and, secondly, a simple polygon. We will refer to the former as <i>poly1</i> and as <i>poly2</i> to the latter.</p>
-
-					<p>The first step of the algorithm is computing the intersections of the edges bordering visible faces of <i>poly1</i> with the edges of <i>poly2</i>. Each of the participating edges is assigned a balanced binary search tree which stores information on its intersections sorted by their position on the respective edge. These binary trees are used to prevent duplicate intersection entries, e.g. by an edge passing through a vertex and thus resulting in intersections from both incident edges on the vertex, by querying for an existing intersection before inserting a new one. Furthermore, they will be used for fast lookup and deletion of the intersection entries later on. The data-structure for the intersections contains the position of the intersection, the two participating edges as well as the next vertex along each edge. For a proper intersection, the next vertices are just the end-points of the participating edge. However, if the intersection itself is on the end-point of one of the edges, the end-point of its successor in the DCEL is assigned as next vertex.</p>
-
-					<p>The second part of the algorithm evaluates the intersections and constructs faces which make up the resulting union. At first, a random intersection found on <i>poly1</i> is picked as starting point and added as the first point of a new face. From the intersection structure, the right next vertex is chosen, so that the area of the resulting polygon is as large as possible. Since it is only possible to move along edges of either <i>poly1</i> or <i>poly2</i>, the result must be their union. More specifically, if we refer to the two possible next vertices as <i>next1</i> and <i>next2</i> from <i>poly1</i> and <i>poly2</i> respectively, the choice of direction goes as follows: if <i>next2</i> is left of the edge ending in <i>next1</i>, choose <i>next1</i> as next direction, if the contrary is true, choose <i>next2</i>. If <i>next2</i> lies on the respective edge, then choose the vertex farther from the intersection point. In case the twin of that edge borders a hole, however, the latter relation is reversed, i.e. the closer vertex is chosen. After the vertex has been determined, the portion of the edge connecting the current intersection to it is queried for the closest intersection. If one is found, its position is added to the face description and the above procedure is performed on it before it is removed. Otherwise, the vertex position is added to the face vertices and the next edges are checked for intersections, adding their end-points while none are found and repeating the above otherwise. When the initial intersection is encountered again, the face is finished. The initial intersection is then also removed. Afterwards, as long as there are any, a new random intersection is picked as the starting point of a new face. The resulting faces are either defined in counterclockwise order if they are visible or clockwise order if they are holes. Combining all faces into a single DCEL yields the final union. A few additional flags ensure that all faces are contained in the result, e.g. if they contained no intersections.</p>
-
-					<b>Others</b>
-					<p>Along the "big" algorithms described above, the game uses several small, yet important, procedures. One of them allows a fast and easy computation of the area of a polygon with holes. Our implementation is on the concept thoroughly described <a href="http://geomalgorithms.com/a01-_area.html#2D%20Polygons">here</a>. More specifically, it returns a signed area, i.e. positive if the polygon is defined counterclockwise and negative otherwise. Thus, we also use it to determine the winding order of, and thus classify, faces created in the union algorithm, for instance.</p>
-
-					<p>Another function which simplified the development of the visibility computation as well as the first-person collision detection significantly was determining whether there is an intersection between a ray/half-line and an edge of the DCEL. While it sounds trivial at first, handling degenerate cases correctly, such as the ray passing through a vertex or originating on the edge, proved essential for the implementation of important functionality.</p>
-				</p>
-			</div>
-		</div>
-	</div>
-</div>
-
 <div id="level-completed" class="transparent" style="display: none;">
 	<p class="title" style="margin: 0px;">LEVEL COMPLETED!</p>
 	<img id="completed-star1" class="star" src="images/star.png"/>
@@ -415,6 +348,73 @@
 <script src="editor.js"></script>
 <script src="gamestate.js"></script>
 <script src="gallery.js"></script>
+
+<div id="about" style="display: none;">
+	<div id="about-menu">
+		<button id="about-button-back" style="margin-bottom: 50px;">BACK</button>
+		<button id="about-button-howto">How to play</button>
+		<button id="about-button-concepts">Concepts</button>
+		<button id="about-button-algorithms">Algorithms</button>
+	</div>
+	<div id="about-content-wrapper" class="transparent rounded">
+		<div id="about-content">
+			<div id="about-howto" class="justified">
+				<p class="title">How to play</p>
+				<p><i>Guard the Gallery</i> is planned to offer two game modes: a single-player mode and a local multi-player mode. Unfortunately <i>Versus Mode</i> is not yet available.</p>
+				<p>Select <i>Story Mode</i> from the main menu to start playing the single-player levels.
+				<i>Continue</i> lets you continue from the level you last played or start from the beginning if this is your first time playing.
+				<i>Select Level</i> lets you select and replay your favorite levels in the story mode.</p>
+				<p>The aim of the game is to guard a gallery by placing guards/cameras. Each camera type has its specific field of view. In a level, the budget and available camera types are listed on the right side of the screen. Click on a camera type and then click inside the gallery to place it at that position. Click and drag a camera to reposition it or click and drag the hightlighted circle to change the direction it is facing. A level is completed when one can oversee all of the gallery with the placed cameras, while not exceeding the budget. After completing the level, you can either continue to the next one or replay the level if you were not able to collect all three stars. Stars are rewarded as follows:</p>
+				<p><img class="mini-star" src="images/star.png"/> : You have completed the level, but you spent the entire budget.</p>
+				<p><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/> : You managed to complete the level, but the solution was more expensive than necessary.</p>
+				<p><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/><img class="mini-star" src="images/star.png"/> : You have completed the level using the least amount of resources possible.</p>
+			</div>
+			<div id="about-concepts" class="justified" style="display: none;">
+				<p class="title">Geometric concepts</p>
+				<p>In geometry, a polygon is a closed figure defined by a certain amount of points and line segments between them such that one contiguous region is enclosed. This game is based on the geometry of polygons and their intersections/unions.</p>
+
+				<p>More specifically, it is inspired by the <i>Art Gallery Problem</i>, which is the problem of finding a set of guards which cover a polygon entirely. We describe the layout of a gallery as a 2D polygon with <i>n</i> points, being the corners of the room. By placing cameras (in essence planes, half-planes, quarter-planes) one must cover the entire gallery. Of course one cannot see through walls, so we must be able to compute the intersection of those planes with our gallery polygon to see what the camera can really overlook. This fact also implies that the region a camera can overlook is again contiguous.</p>
+
+				<p>In the case where there are multiple cameras deployed, we want to know what the total overlooked area is. Therefore we must also be able to compute the area of two (generally overlapping) polygons.</p>
+			</div>
+			<div id="about-algorithms" class="justified" style="display: none;">
+				<p class="title">Algorithms</p>
+				<p>The game mainly relies on two geometric algorithms and one data-structure, which are described in the detail below.</p>
+				<p>
+					<b>Doubly-Connected Edge List</b><br/>
+					<p>A <i>doubly-connected edge list (DCEL)</i> is a data-structure often used to describe a decomposition of a plane. It holds describes the relations between points, line segments and faces. If we consider the decompoisition as a graph, the points are represented by <i>vertices</i> and the line segments by <i>edges</i>. Since each edge borders two <i>faces</i>, edges are further split in <i>half-edges</i>, one in each of the two directions of the line segment.</p>
+
+					<p>As the name suggests, the half-edges form a doubly linked list, i.e. each half-edge points to its predecessor and to its successor. Further, each half-edge contains pointers to its origin vertex, the face it is defining as well as its <i>twin</i> half-edge. Vertices contain a pointer to one of the half-edges originating from that vertex as well as its position as a 2D vector. Faces have only a pointer to one of their defining half-edges. Additionally, all entries are given two fields for arbitrary payloads. A <i>tag</i> field is used to store permanent information associated with that entry and a <i>temp</i> field is used to store temporary information, such as flags or states used in specific functions. To fully define the DCEL, the winding order of the edges defining the faces must fixed. In our case, we have chosen it to be counterclockwise.</p>
+
+					<p>For convenience, all entries of the DCEL are further contained in lists, one per entry type. This allows, for instance, easier iteration over all half-edges regardless of which face they belong to. Due to the relatively small DCEL sizes in the game, convenience was chose over the slightly larger memory footprint.</p>
+
+					<b>Visibility Polygon</b><br/>
+					<p>An essential part of the game is obviously computing which part of the gallery each camera can see. The resulting shape is called the <i>visibility polygon</i> of the point representing the position of the camera. To compute the visibility polygons we employ a typical angular sweep algorithm. While the algorithm would normally have a complexity of order <i>O(n log(n))</i> using an appropriate status data-structure, our implementation has a complexity of order <i>O(n²)</i> due to time constraints. Once again, due to the low number of vertices/edges <i>n</i>, the run-time difference is marginal.</p>
+
+					<p>As the first step of the algorithm, all vertices are sorted by their angle relative to the direction the guard is facing. To account for collinear points, vertices with the same angle are further sorted by their distance from the guard. Afterwards, the vertices are traversed in the sorted order. For each vertex a half-line starting at the guard and passing through that vertex is intersected with all edges bordering the "main" face (i.e. visible part of the level, unlike holes) to find the closest intersection to the guard. If that intersection is closer to the guard, then the regarded vertex is not visible and nothing has to be done. Otherwise, firstly the number of consecutive collinear points is counted. Then, the current, and closest collinear, vertex is assigned assigned one of three categories depending on the position of its two incident half-edges. Examples of the three cases are illustrated below, where the red dots indicate the current vertex and the green dots represent the guard.</p>
+					<p style="text-align: center;"><img src="images/visibility-cases.png"/></p>
+					<p>If the current vertex is of type 1, then the visibility of the guard is obviously blocked by it, so the vertex is added to the visibility polygon and any further collinear vertices are skipped. If the vertex is of either type 2 or type 3, a linear search is performed to find the first collinear vertex of a different type closer to the guard than the previously computed closest intersection. If such a vertex is found, it is considered to block visibility, so it is part of the visibility polygon. If the search did not yield a result, the closest intersection point takes its place instead. The order in which the original vertex and the result of the search are added depends on the type of the closest vertex. Then, once again, the iteration skips to the next non-collinear vertex and repeats the same process.</p>
+
+					<p>Due to the nature of the algorithm, guards with limited field of view angles can be considered by defining a minimal and a maximal angle for the guard. When iterating over the vertices, all vertices with angles outside of this interval can be ignored as they will definitely not be visible. However, when stepping over each of the boundaries of the interval, an additional point must be added to the visibility polygon, if there is no vertex at that specific angle.</p>
+
+					<b>Union Computation</b>
+					<p>In order to check if a level is completed, we must determine what the ratio of guarded to total area of the polygon is. The guarded area is the area of the union of all visibility polygons. Since those are generally overlapping, we cannot simply add the individual areas. Instead, we compute the union explicitly and then determine its area. While computing the union of simple polygons in itself is not trivial, matters are further complicated by the fact that the union of two visibility polygons is in general not a simple polygon anymore, but can contain disjoint polygons and holes.</p>
+
+					<p>In order to simplify the algorithm as much as possible, we consider a binary union operation instead of computing the union of all polygons at once. Thus, for each visibility polygon but the first one, a union operation with an intermediate result is performed to get the complete union. Accordingly, the input is assumed to consist of, firstly, a polygonal shape possibly containing multiple disjoint faces with holes and, secondly, a simple polygon. We will refer to the former as <i>poly1</i> and as <i>poly2</i> to the latter.</p>
+
+					<p>The first step of the algorithm is computing the intersections of the edges bordering visible faces of <i>poly1</i> with the edges of <i>poly2</i>. Each of the participating edges is assigned a balanced binary search tree which stores information on its intersections sorted by their position on the respective edge. These binary trees are used to prevent duplicate intersection entries, e.g. by an edge passing through a vertex and thus resulting in intersections from both incident edges on the vertex, by querying for an existing intersection before inserting a new one. Furthermore, they will be used for fast lookup and deletion of the intersection entries later on. The data-structure for the intersections contains the position of the intersection, the two participating edges as well as the next vertex along each edge. For a proper intersection, the next vertices are just the end-points of the participating edge. However, if the intersection itself is on the end-point of one of the edges, the end-point of its successor in the DCEL is assigned as next vertex.</p>
+
+					<p>The second part of the algorithm evaluates the intersections and constructs faces which make up the resulting union. At first, a random intersection found on <i>poly1</i> is picked as starting point and added as the first point of a new face. From the intersection structure, the right next vertex is chosen, so that the area of the resulting polygon is as large as possible. Since it is only possible to move along edges of either <i>poly1</i> or <i>poly2</i>, the result must be their union. More specifically, if we refer to the two possible next vertices as <i>next1</i> and <i>next2</i> from <i>poly1</i> and <i>poly2</i> respectively, the choice of direction goes as follows: if <i>next2</i> is left of the edge ending in <i>next1</i>, choose <i>next1</i> as next direction, if the contrary is true, choose <i>next2</i>. If <i>next2</i> lies on the respective edge, then choose the vertex farther from the intersection point. In case the twin of that edge borders a hole, however, the latter relation is reversed, i.e. the closer vertex is chosen. After the vertex has been determined, the portion of the edge connecting the current intersection to it is queried for the closest intersection. If one is found, its position is added to the face description and the above procedure is performed on it before it is removed. Otherwise, the vertex position is added to the face vertices and the next edges are checked for intersections, adding their end-points while none are found and repeating the above otherwise. When the initial intersection is encountered again, the face is finished. The initial intersection is then also removed. Afterwards, as long as there are any, a new random intersection is picked as the starting point of a new face. The resulting faces are either defined in counterclockwise order if they are visible or clockwise order if they are holes. Combining all faces into a single DCEL yields the final union. A few additional flags ensure that all faces are contained in the result, e.g. if they contained no intersections.</p>
+
+					<b>Others</b>
+					<p>Along the "big" algorithms described above, the game uses several small, yet important, procedures. One of them allows a fast and easy computation of the area of a polygon with holes. Our implementation is on the concept thoroughly described <a href="http://geomalgorithms.com/a01-_area.html#2D%20Polygons">here</a>. More specifically, it returns a signed area, i.e. positive if the polygon is defined counterclockwise and negative otherwise. Thus, we also use it to determine the winding order of, and thus classify, faces created in the union algorithm, for instance.</p>
+
+					<p>Another function which simplified the development of the visibility computation as well as the first-person collision detection significantly was determining whether there is an intersection between a ray/half-line and an edge of the DCEL. While it sounds trivial at first, handling degenerate cases correctly, such as the ray passing through a vertex or originating on the edge, proved essential for the implementation of important functionality.</p>
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
 
 </body>
 </html>

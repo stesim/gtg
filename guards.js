@@ -18,7 +18,7 @@ var GuardTypes =
 [
 	new GuardType(
 		"360° Camera",
-		800,
+		1000,
 		function( dcel, guard )
 		{
 			return visibility( dcel, guard.position );
@@ -27,7 +27,7 @@ var GuardTypes =
 
 	new GuardType(
 		"180° Camera",
-		400,
+		600,
 		function( dcel, guard )
 		{
 			return visibility(
@@ -43,7 +43,7 @@ var GuardTypes =
 
 	new GuardType(
 		"90° Camera",
-		200,
+		400,
 		function( dcel, guard )
 		{
 			return visibility(
