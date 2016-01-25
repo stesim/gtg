@@ -926,7 +926,7 @@ parseSvg: function( svg )
 
 		if( !error )
 		{
-			if( segments[ j ].id === "0" )
+			if( pathElems[ j ].id !== "0" )
 			{
 				faces.push( points );
 			}
