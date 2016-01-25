@@ -59,6 +59,45 @@ var GameStates =
 			graphics.enableRendering();
 		} ),
 
+	About: new GameState(
+		"About",
+		function()
+		{
+			function changeContent( content )
+			{
+				UI.hide( UI.get( "about-howto" ) );
+				UI.hide( UI.get( "about-concepts" ) );
+				UI.hide( UI.get( "about-algorithms" ) );
+
+				UI.show( UI.get( "about-" + content ) );
+			}
+
+			if( !this.initialized )
+			{
+				this.initialized = true;
+
+				UI.get( "about-button-howto" ).onclick =
+					changeContent.bind( this, "howto" );
+				UI.get( "about-button-concepts" ).onclick =
+					changeContent.bind( this, "concepts" );
+				UI.get( "about-button-algorithms" ).onclick =
+					changeContent.bind( this, "algorithms" );
+
+				UI.get( "about-button-back" ).onclick =
+					function() { GameState.set( GameStates.Menu ); };
+			}
+
+			graphics.disableRendering();
+
+			UI.show( UI.get( "about" ) );
+		},
+		function()
+		{
+			UI.hide( UI.get( "about" ) );
+
+			graphics.enableRendering();
+		} ),
+
 	LevelEditing: new GameState(
 		"LevelEditing",
 		LevelEditor.onLoad.bind( LevelEditor ),

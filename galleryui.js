@@ -24,7 +24,13 @@ var ui =
 			{
 				ui.hint.display( "Versus Mode is not available yet.", 5 );
 			} ).position( { top: 40, left: 0 } ).show().disable() );
-		
+
+		ui.mainMenu.add( new UI.Button( "About",
+			function()
+			{
+				GameState.set( GameStates.About );
+			} ).position( { top: 80, left: 0 } ).show() );
+
 		ui.mainMenu.add( new UI.Button( "Developer",
 			function()
 			{
@@ -32,7 +38,7 @@ var ui =
 				ui.developerMenu.show();
 
 				GameStates.Menu.lastVisible = ui.developerMenu;
-			} ).position( { top: 120, left: 0 } ).show() );
+			} ).position( { top: 160, left: 0 } ).show() );
 
 		ui.developerMenu = new UI.Group()
 			.position( { top: 200, left: 100 } )
