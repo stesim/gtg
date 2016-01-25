@@ -59,7 +59,7 @@ var graphics =
 	wallMaterial: null,
 	floorMaterial: null,
 	visbilityMaterial: null,
-	numPictures: 83,
+	numPictures: 139,
 	loadedPictures: 0,
 	onTexturesLoaded: null,
 	pictureMaterials: new Array(),
