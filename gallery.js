@@ -847,7 +847,7 @@ function checkAreaCompletion()
 
 	console.log( guardedArea + " / " + totalArea + " (" + ( 100 * guardedArea / totalArea ) + "%)" );
 
-	if( guardedArea / totalArea >= 0.998 )
+	if( guardedArea / totalArea >= 0.99 )
 	{
 		GameState.set( GameStates.LevelCompleted );
 	}
