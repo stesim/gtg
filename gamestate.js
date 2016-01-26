@@ -126,7 +126,7 @@ var GameStates =
 						museumImage: "museum1.jpg"
 					},
 					{
-						task: "Hey, I heard what you did at that local art gallery. I must say, you did an impressive job. What do you say to a promotion? I am the chief of a national art museum, we focus mainly on architecture and we always need intelligent staff like you. <br/><br/> Let's see what you can do...",
+						task: "Hey, I heard what you did at that local art gallery. I must say, you did an impressive job. What do you say to a promotion? I am the chief of a national art museum, we focus mainly on architecture and we always need intelligent staff like you. Let's see what you can do...",
 						taskImage: "task2.jpg",
 						museumImage: "museum2.jpg"
 					},
