@@ -114,6 +114,21 @@ var ui =
 			.size( 125, 200 )
 			.cssClass( "verticalMenu" );
 
+		ui.levelsMenu.add( new UI.Text( "Museum 1" )
+			.position( { top: 0, left: 0 } )
+			.size( 125, 0 )
+			.cssClass( "centered" ).show() );
+
+		ui.levelsMenu.add( new UI.Text( "Museum 2" )
+			.position( { top: 0, left: 175 } )
+			.size( 125, 0 )
+			.cssClass( "centered" ).show() );
+
+		ui.levelsMenu.add( new UI.Text( "Museum 3" )
+			.position( { top: 0, left: 525 } )
+			.size( 125, 0 )
+			.cssClass( "centered" ).show() );
+
 		var levelOnclick =
 			function( i )
 			{
@@ -123,7 +138,7 @@ var ui =
 		{
 			ui.levelsMenu.add( new UI.Button( levels[ i ].name,
 				levelOnclick.bind( this, i ) )
-					.position( { top: 40 * ( i % 4 ), left: 175 * Math.floor( i / 4 ) } ).show() );
+					.position( { top: 40 + 40 * ( i % 5 ), left: 175 * Math.floor( i / 5 ) } ).show() );
 		}
 		ui.levelsMenu.add( new UI.Button( "BACK",
 			function()
@@ -132,7 +147,7 @@ var ui =
 				ui.storyMenu.show();
 
 				GameStates.Menu.lastVisible = ui.storyMenu;
-			} ).position( { top: 5 * 40, left: 0 } ).show() );
+			} ).position( { top: 40 + 6 * 40, left: 0 } ).show() );
 
 		ui.ingameMenu = new UI.Group()
 			.position( { top: 15, left: 15 } ).cssClass( "horizontalMenu" );

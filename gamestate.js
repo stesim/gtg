@@ -121,7 +121,7 @@ var GameStates =
 				this.screens =
 				[
 					{
-						task: "Hey, good that you're here, I've got a job for you! I just opened the \"Mark Fellanti Art Gallery of Beautiful Animals\" and I need help guarding it. You think you can help me? It is pretty simple, we'll work it room-by-room. For each room you get a budget you can spend on security cameras. You need to place them at the right position, so every piece of valuable art can be seen. Come on, try it out!",
+						task: "Hey, good that you're here, I've got a job for you! I just opened the \"Mark Fellanti Art Gallery of Beautiful Animals\" and I need help guarding it. You think you can help me? It is pretty simple, we'll work it room-by-room. For each room you get a budget you can spend on security cameras. You need to place them at the right position, so the entire room can be seen. Come on, try it out!",
 						taskImage: "task1.jpg",
 						museumImage: "museum1.jpg"
 					},

@@ -55,6 +55,8 @@ function init()
 
 		GameState.set( GameStates.Menu );
 
+		ui.hint.display( "WARNING: The game has only been tested sufficiently on Chrome. On other browsers it might not work as intented or at all.", 10 );
+
 		graphics.render();
 	}
 	graphics.init( update );
