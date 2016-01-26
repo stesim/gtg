@@ -242,14 +242,24 @@
 	}
 	#splash
 	{
+		position: absolute;
+		top: 50%;
+		left: 50%;
 		width: 800px;
 		height: 600px;
+		margin-top: -300px;
+		margin-left: -400px;
+		opacity: 0.0;
+		transition: opacity 0.5s;
 	}
 	#splash-text
 	{
 		position: absolute;
-		top: 30%;
+		top: 20%;
 		width: 100%;
+		overflow: hidden;
+		padding: 15px;
+		box-sizing: border-box;
 	}
 	#level-completed
 	{

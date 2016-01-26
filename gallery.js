@@ -303,6 +303,8 @@ function toVectorArray( level )
 
 function loadLevel( level )
 {
+	GameStates.SplashScreen.previousLevel = currentLevel;
+
 	GameState.set( GameStates.LevelLoading );
 
 	selectedGuardType = null;
@@ -313,9 +315,6 @@ function loadLevel( level )
 	restart();
 
 	graphics.overview.activate();
-
-	var splashImage = null;
-	var splashText = null;
 
 	currentLevel = level;
 
@@ -343,7 +342,7 @@ function loadLevel( level )
 	ui.levelDetails.title.text( currentLevel.name );
 	ui.levelDetails.description.text( currentLevel.description );
 
-	GameState.set( GameStates.GuardPlacement );
+	GameState.set( GameStates.SplashScreen );
 }
 
 function updateGuardDetails()
