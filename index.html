@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<title>Art Gallery</title>
+	<title>Guard the Gallery</title>
 	<meta charset="utf-8">
 	<style>
 	button, input
@@ -130,7 +130,6 @@
 		position: absolute;
 		top: 50%;
 		left: 50%;
-		width: 14em;
 		height: 2em;
 		margin-top: -1em;
 		margin-left: -7em;
@@ -288,6 +287,37 @@
 <body style="margin: 0; padding: 0; overflow: hidden; color: #ffffff; background: #1b1b1b;">
 
 <div id="loading" class="transparent rounded">LOADING...</div>
+<script>
+var loadingTexts =
+[
+	"Building the museums... Please wait.",
+	"Painting the art... Please wait.",
+	"Framing the art... Please wait.",
+	"Hanging the art... Please wait.",
+	"Cleaning the floor... Please wait.",
+	"Printing tickets... Please wait.",
+	"Writing museums guides... Please wait.",
+	"Opening the doors... Please wait."
+];
+var currentLoadingText = 0;
+var loadingInterval = null;
+
+var loadingElem = document.getElementById( "loading" );
+loadingElem.textContent = loadingTexts[ currentLoadingText++ ];
+loadingElem.style.display = null;
+loadingInterval = setInterval( function()
+	{
+		if( currentLoadingText < loadingTexts.length )
+		{
+			loadingElem.textContent = loadingTexts[ currentLoadingText++ ];
+		}
+		else
+		{
+			clearInterval( loadingInterval );
+		}
+	},
+	3000 );
+</script>
 
 <div id="splash" style="display: none;">
 	<div id="splash-text" class="transparent"></div>

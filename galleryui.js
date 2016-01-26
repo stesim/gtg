@@ -120,12 +120,12 @@ var ui =
 			.cssClass( "centered" ).show() );
 
 		ui.levelsMenu.add( new UI.Text( "Museum 2" )
-			.position( { top: 0, left: 175 } )
+			.position( { top: 0, left: 525 } )
 			.size( 125, 0 )
 			.cssClass( "centered" ).show() );
 
 		ui.levelsMenu.add( new UI.Text( "Museum 3" )
-			.position( { top: 0, left: 525 } )
+			.position( { top: 0, left: 700 } )
 			.size( 125, 0 )
 			.cssClass( "centered" ).show() );
 

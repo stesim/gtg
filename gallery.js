@@ -49,13 +49,17 @@ function init()
 
 	graphics.onTexturesLoaded = function()
 	{
+		if( loadingInterval !== null )
+		{
+			clearInterval( loadingInterval );
+		}
 		UI.hide( UI.get( "loading" ) );
 
 		LevelEditor.init();
 
 		GameState.set( GameStates.Menu );
 
-		ui.hint.display( "WARNING: The game has only been tested sufficiently on Chrome. On other browsers it might not work as intented or at all.", 10 );
+		ui.hint.display( "WARNING: The game has only been tested sufficiently on Chrome/Chromium. On other browsers it might not work as intented or at all.", 10 );
 
 		graphics.render();
 	}
