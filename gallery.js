@@ -314,6 +314,9 @@ function loadLevel( level )
 
 	graphics.overview.activate();
 
+	var splashImage = null;
+	var splashText = null;
+
 	currentLevel = level;
 
 	loadLevelGeometry();
