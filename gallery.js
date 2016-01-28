@@ -47,6 +47,9 @@ function init()
 
 	time = new THREE.Clock( true );
 
+	audio.init();
+	audio.playLoadingTrack();
+
 	graphics.onTexturesLoaded = function()
 	{
 		if( loadingInterval !== null )
@@ -62,6 +65,8 @@ function init()
 		ui.hint.display( "WARNING: The game has only been tested sufficiently on Chrome/Chromium. On other browsers it might not work as intented or at all.", 10 );
 
 		graphics.render();
+
+		audio.playRandomAmbient();
 	}
 	graphics.init( update );
 

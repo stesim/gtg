@@ -399,6 +399,8 @@ loadingInterval = setInterval( function()
 <script src="three.min.js"></script>
 <script src="rbtree.min.js"></script>
 
+<script src="audio.js"></script>
+
 <script src="util.js"></script>
 <script src="dcel.js"></script>
 <script src="visibility.js"></script>
@@ -420,6 +422,7 @@ loadingInterval = setInterval( function()
 		<button id="about-button-howto">How to play</button>
 		<button id="about-button-concepts">Concepts</button>
 		<button id="about-button-algorithms">Algorithms</button>
+		<button id="about-button-credits">Credits</button>
 	</div>
 	<div id="about-content-wrapper" class="transparent rounded">
 		<div id="about-content">
@@ -477,7 +480,28 @@ loadingInterval = setInterval( function()
 					<p>Along the "big" algorithms described above, the game uses several small, yet important, procedures. One of them allows a fast and easy computation of the area of a polygon with holes as thoroughly described <a href="http://geomalgorithms.com/a01-_area.html#2D%20Polygons">here</a>. More specifically, it returns a signed area, i.e. positive if the polygon is defined counterclockwise and negative otherwise. Thus, we also use it to determine the winding order of, and thus classify, faces created in the union algorithm, for instance.</p>
 
 					<p>Another function which simplified the development of the visibility computation as well as the first-person collision detection significantly was determining whether there is an intersection between a ray/half-line and an edge of the DCEL. While it sounds trivial at first, handling degenerate cases correctly, such as the ray passing through a vertex or originating on the edge, proved essential for the implementation of important functionality.</p>
+
+					<p>For the union computation, we further use <a href="https://github.com/vadimg/js_bintrees">a red-black tree implementation by Vadim Graboys</a>.</p>
 				</p>
+			</div>
+			<div id="about-credits" class="justified" style="display: none;">
+				<p class="title">Credits</p>
+				<b>Game Design & Development</b>
+				<ul>
+					<li>Stefan Simeonov</li>
+					<li>Frank Schneider</li>
+					<li>Jasper Landa</li>
+				</ul>
+				<b>Art</b>
+				<ul>
+					<li>TODO</li>
+				</ul>
+				<b>Music</b>
+				<ul>
+					<li><a href="https://soundcloud.com/zet237/elevator-music-2">Zet</a></li>
+					<li><a href="http://sweetwaveaudio.co.uk/">Sweet Wave Audio</a></li>
+					<li><a href="https://soundcloud.com/essa-1/ambient-loop-1-free-to-use">Essa</a></li>
+				</ul>
 			</div>
 		</div>
 	</div>

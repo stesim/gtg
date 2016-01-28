@@ -105,7 +105,7 @@ Button: function( text, onclick, group )
 
 	this.elem = document.createElement( "button" );
 	this.elem.innerHTML = text;
-	this.elem.onclick = onclick;
+	this.elem.onclick = function() { audio.playButtonClick(); onclick(); };
 	this.elem.style.position = "absolute";
 	this.elem.style.display = "none";
 

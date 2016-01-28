@@ -68,6 +68,7 @@ var GameStates =
 				UI.hide( UI.get( "about-howto" ) );
 				UI.hide( UI.get( "about-concepts" ) );
 				UI.hide( UI.get( "about-algorithms" ) );
+				UI.hide( UI.get( "about-credits" ) );
 
 				UI.show( UI.get( "about-" + content ) );
 			}
@@ -82,6 +83,8 @@ var GameStates =
 					changeContent.bind( this, "concepts" );
 				UI.get( "about-button-algorithms" ).onclick =
 					changeContent.bind( this, "algorithms" );
+				UI.get( "about-button-credits" ).onclick =
+					changeContent.bind( this, "credits" );
 
 				UI.get( "about-button-back" ).onclick =
 					function() { GameState.set( GameStates.Menu ); };
