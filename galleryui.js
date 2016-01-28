@@ -88,7 +88,8 @@ var ui =
 		ui.storyMenu.add( new UI.Button( "Continue",
 			function()
 			{
-				loadLevel( levels[ 0 ] );
+				var progress = Cookie.get( "progress" );
+				loadLevel( levels[ isNaN( progress ) ? 0 : progress ] );
 			} ).position( { top: 0, left: 0 } ).show() );
 
 		ui.storyMenu.add( new UI.Button( "Select Level",
@@ -129,16 +130,25 @@ var ui =
 			.size( 125, 0 )
 			.cssClass( "centered" ).show() );
 
-		var levelOnclick =
-			function( i )
-			{
-				loadLevel( levels[ i ] );
-			};
+		var levelOnclick = function( i ) { loadLevel( levels[ i ] ); };
+		var progress = Cookie.getInt( "progress" );
+		if( isNaN( progress ) )
+		{
+			progress = 0;
+		}
+		ui.levelsMenu.buttons = new Array( levels.length );
 		for( var i = 0; i < levels.length; ++i )
 		{
-			ui.levelsMenu.add( new UI.Button( levels[ i ].name,
-				levelOnclick.bind( this, i ) )
-					.position( { top: 40 + 40 * ( i % 5 ), left: 175 * Math.floor( i / 5 ) } ).show() );
+			ui.levelsMenu.buttons[ i ] = new UI.Button( levels[ i ].name,
+				levelOnclick.bind( this, i ), ui.levelsMenu )
+					.position( {
+						top: 40 + 40 * ( i % 5 ),
+						left: 175 * Math.floor( i / 5 ) } )
+					.show();
+			if( i > progress )
+			{
+				ui.levelsMenu.buttons[ i ].disable();
+			}
 		}
 		ui.levelsMenu.add( new UI.Button( "BACK",
 			function()

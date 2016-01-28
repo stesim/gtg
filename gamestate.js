@@ -186,16 +186,17 @@ var GameStates =
 			}
 
 			this.stage = null;
-			if( this.previousLevel === null && currentLevel === levels[ 0 ] )
+			if( isNaN( Cookie.getInt( "s0" ) ) &&
+				currentLevel === levels[ 0 ] )
 			{
 				this.stage = 0;
 			}
-			else if( ( this.previousLevel === null || this.previousLevel === levels[ 14 ] ) &&
+			else if( isNaN( Cookie.getInt( "s15" ) ) &&
 				currentLevel === levels[ 15 ] )
 			{
 				this.stage = 1;
 			}
-			else if( ( this.previousLevel === null || this.previousLevel === levels[ 19 ] ) &&
+			else if( isNaN( Cookie.getInt( "s20" ) ) &&
 				currentLevel === levels[ 20 ] )
 			{
 				this.stage = 2;
@@ -257,47 +258,61 @@ var GameStates =
 		"LevelCompleted",
 		function()
 		{
-			//ui.completionText.show();
+			var levelIndex = levels.indexOf( currentLevel );
+
 			var opacity = 0.2;
 			var spentBudget = currentLevel.budget - currentBudget;
+			var stars;
 			if( !currentLevel.requiredBudget )
 			{
-				UI.get( "completed-star2" ).style.opacity = null;
-				UI.get( "completed-star3" ).style.opacity = null;
-				UI.hide( UI.get( "completed-star4" ) );
+				stars = 3;
 			}
 			else if( spentBudget < currentLevel.requiredBudget )
 			{
-				UI.get( "completed-star2" ).style.opacity = null;
-				UI.get( "completed-star3" ).style.opacity = null;
-				UI.show( UI.get( "completed-star4" ) );
+				stars = 4;
 			}
 			else if( spentBudget ===  currentLevel.requiredBudget ||
 				currentLevel.requiredBuget === currentLevel.budget )
 			{
-				UI.get( "completed-star2" ).style.opacity = null;
-				UI.get( "completed-star3" ).style.opacity = null;
-				UI.hide( UI.get( "completed-star4" ) );
+				stars = 3;
 			}
 			else if( spentBudget > currentLevel.requiredBudget &&
 				spentBudget < currentLevel.budget )
 			{
-				UI.get( "completed-star2" ).style.opacity = null;
-				UI.get( "completed-star3" ).style.opacity = opacity;
-				UI.hide( UI.get( "completed-star4" ) );
+				stars = 2;
 			}
 			else
 			{
-				UI.get( "completed-star2" ).style.opacity = opacity;
-				UI.get( "completed-star3" ).style.opacity = opacity;
-				UI.hide( UI.get( "completed-star4" ) );
+				stars = 1;
 			}
 
-			UI.show( UI.get( "level-completed" ) );
+			UI.get( "completed-star2" ).style.opacity =
+				( stars >= 2 ? null : opacity );
+			UI.get( "completed-star3" ).style.opacity =
+				( stars >= 3 ? null : opacity );
+			UI.setVisibility( UI.get( "completed-star4" ), stars >= 4 );
 
-			var levelIndex = levels.indexOf( currentLevel );
 			UI.setVisibility( UI.get( "completed-next" ),
 				( levelIndex >= 0 && levelIndex < levels.length - 1 ) );
+			UI.show( UI.get( "level-completed" ) );
+
+			if( levelIndex < 0 ) { return; }
+
+			var currentProgress = Cookie.getInt( "progress" );
+			if( isNaN( currentProgress ) || currentProgress <= levelIndex )
+			{
+				Cookie.set( "progress", levelIndex + 1 );
+				if( levelIndex + 1 < levels.length )
+				{
+					ui.levelsMenu.buttons[ levelIndex + 1 ].enable();
+				}
+			}
+
+			var currentStars = Cookie.getInt( "s" + levelIndex );
+			if( isNaN( currentStars ) || currentStars < stars )
+			{
+				Cookie.set( "s" + levelIndex, stars );
+			}
 		},
 		function()
 		{

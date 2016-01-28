@@ -95,6 +95,8 @@ function init()
 	document.addEventListener( "keydown", onKeyDown, false );
 	document.addEventListener( "keyup", onKeyUp, false );
 
+	Cookie.init();
+
 	ui.init();
 
 	UI.get( "completed-retry" ).onclick = function()
