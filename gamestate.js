@@ -312,6 +312,9 @@ var GameStates =
 			if( isNaN( currentStars ) || currentStars < stars )
 			{
 				Cookie.set( "s" + levelIndex, stars );
+
+				ui.levelsMenu.buttons[ levelIndex ].cssClass(
+					"bg" + stars + "stars" );
 			}
 		},
 		function()

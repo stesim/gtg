@@ -149,6 +149,15 @@ var ui =
 			{
 				ui.levelsMenu.buttons[ i ].disable();
 			}
+			else
+			{
+				var stars = Cookie.get( "s" + i );
+				if( !isNaN( stars ) )
+				{
+					ui.levelsMenu.buttons[ i ].cssClass(
+						"bg" + stars + "stars" );
+				}
+			}
 		}
 		ui.levelsMenu.add( new UI.Button( "BACK",
 			function()
